@@ -20,7 +20,7 @@ const agents = [
 ];
 let app = null, browser = null;
 try {
-  app = await startApp(sb, { agents, extraEnv: { AGENT_TERMINAL_CWD_PRESETS: `~,${sb.tmp}` } });
+  app = await startApp(sb, { agents, extraEnv: { TMUX_TERMINALS_CWD_PRESETS: `~,${sb.tmp}` } });
   browser = await chromium.launch();
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
   const page = await ctx.newPage();

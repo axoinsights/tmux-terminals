@@ -1,4 +1,4 @@
-/** `agent-terminal smoke`: end-to-end check of a RUNNING server (healthz, auth required, authenticated WebSocket, shell echo, kill). */
+/** `tmux-terminals smoke`: end-to-end check of a RUNNING server (healthz, auth required, authenticated WebSocket, shell echo, kill). */
 import * as crypto from "node:crypto";
 import { WebSocket } from "ws";
 import { loadConfig, type Flags } from "./config.js";
@@ -48,7 +48,7 @@ export async function runSmoke(flags: Flags, agent = "shell"): Promise<SmokeResu
     ws.close();
     rec(`authenticated WebSocket: spawned "${agent}", typed a command, got its output back, killed the session`, echoed === true, echoed === true ? undefined : String(echoed));
   } catch (e) {
-    rec("server reachable", false, `${(e as Error).message}. Is it running? (agent-terminal status)`);
+    rec("server reachable", false, `${(e as Error).message}. Is it running? (tmux-terminals status)`);
   }
   return { ok: steps.every((s) => s.ok), steps };
 }

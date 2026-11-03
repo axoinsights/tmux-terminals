@@ -1,12 +1,12 @@
 {
-  "name": "agent-terminal",
+  "name": "tmux-terminals",
   "version": "0.1.0",
   "description": "Self-hosted, phone-friendly web terminal for driving coding agents (Claude Code, Codex, aider, pi, or a shell) that run in tmux on your own machine.",
   "license": "MIT",
-  "author": "Axo Insights",
+  "author": "Axo Insights (https://www.axoinsights.com)",
   "type": "module",
   "bin": {
-    "agent-terminal": "bin/agent-terminal.mjs"
+    "tmux-terminals": "bin/tmux-terminals.mjs"
   },
   "files": [
     "bin",
@@ -27,8 +27,8 @@
   "scripts": {
     "build": "tsc",
     "prepare": "node scripts/prepare.mjs",
-    "start": "node bin/agent-terminal.mjs",
-    "doctor": "node bin/agent-terminal.mjs doctor",
+    "start": "node bin/tmux-terminals.mjs",
+    "doctor": "node bin/tmux-terminals.mjs doctor",
     "test": "npm run build && node --test test/unit/*.test.mjs && node test/run-e2e.mjs",
     "test:unit": "npm run build && node --test test/unit/*.test.mjs"
   },
@@ -58,5 +58,16 @@
     "@types/qrcode": "^1.5.5",
     "@types/ws": "^8.5.12",
     "typescript": "^5.6.0"
+  },
+  "homepage": "https://github.com/axoinsights/tmux-terminals#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/axoinsights/tmux-terminals.git"
+  },
+  "bugs": {
+    "url": "https://github.com/axoinsights/tmux-terminals/issues"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

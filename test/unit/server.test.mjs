@@ -15,7 +15,7 @@ const { WebSocket } = require("ws");
 const TOKEN = crypto.randomBytes(18).toString("base64url");
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "at-srv-"));
 const { config } = loadConfig({
-  env: { AGENT_TERMINAL_CONFIG_DIR: dir, AGENT_TERMINAL_TOKEN: TOKEN, AGENT_TERMINAL_TMUX_SOCKET: `at-unit-${process.pid}-${crypto.randomBytes(2).toString("hex")}` },
+  env: { TMUX_TERMINALS_CONFIG_DIR: dir, TMUX_TERMINALS_TOKEN: TOKEN, TMUX_TERMINALS_TMUX_SOCKET: `at-unit-${process.pid}-${crypto.randomBytes(2).toString("hex")}` },
 });
 const srv = await startServer({ config: { ...config, port: 0 }, stateDir: dir });
 const base = `http://127.0.0.1:${srv.port}`;
@@ -53,13 +53,13 @@ test("opening ?token= sets an HttpOnly cookie and redirects to a URL without the
   assert.equal(r.status, 302);
   assert.equal(r.headers.get("location"), "/?ui=en");
   const cookie = r.headers.get("set-cookie");
-  assert.match(cookie, /^at_auth=/);
+  assert.match(cookie, /^tmux_terminals_auth=/);
   assert.match(cookie, /HttpOnly/);
   assert.match(cookie, /SameSite=Strict/);
   assert.ok(!/Secure/.test(cookie), "no Secure flag on plain http");
   const page = await get("/", { Cookie: cookie.split(";")[0] });
   assert.equal(page.status, 200);
-  assert.match(await page.text(), /Agent Terminal/);
+  assert.match(await page.text(), /Tmux Terminals/);
   const proxied = await get(`/?token=${TOKEN}`, { "X-Forwarded-Proto": "https" });
   assert.match(proxied.headers.get("set-cookie"), /Secure/);
 });

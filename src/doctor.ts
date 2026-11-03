@@ -1,4 +1,4 @@
-/** `agent-terminal doctor`: environment checks with concrete fixes. Exit code non-zero when any check fails. */
+/** `tmux-terminals doctor`: environment checks with concrete fixes. Exit code non-zero when any check fails. */
 import * as fs from "node:fs";
 import * as net from "node:net";
 import * as http from "node:http";
@@ -60,10 +60,10 @@ async function ptyCheck(): Promise<Check> {
   try {
     const pty = await import("@homebridge/node-pty-prebuilt-multiarch");
     const out = await new Promise<string>((resolve, reject) => {
-      const p = pty.spawn("/bin/sh", ["-c", "echo agent-terminal-pty-ok"], { name: "xterm-256color", cols: 80, rows: 24 });
+      const p = pty.spawn("/bin/sh", ["-c", "echo tmux-terminals-pty-ok"], { name: "xterm-256color", cols: 80, rows: 24 });
       let buf = "";
       const t = setTimeout(() => { try { p.kill(); } catch { /* gone */ } reject(new Error("pty produced no output within 4s")); }, 4000);
-      p.onData((d) => { buf += d; if (buf.includes("agent-terminal-pty-ok")) { clearTimeout(t); resolve(buf); } });
+      p.onData((d) => { buf += d; if (buf.includes("tmux-terminals-pty-ok")) { clearTimeout(t); resolve(buf); } });
     });
     return { id: "node-pty", status: out ? "ok" : "fail", message: "node-pty loads and can run a command" };
   } catch (e) {
@@ -87,7 +87,7 @@ export async function runDoctor(opts: DoctorOptions = {}): Promise<Report> {
     : { id: "node", status: "fail", message: `Node ${process.versions.node} is too old (need >= 20)`, fix: "Install Node 20 or newer (https://nodejs.org or nvm install 22)" });
 
   if (process.platform === "win32") {
-    add({ id: "platform", status: "fail", message: "Windows is not supported natively", fix: "Use WSL2 (Ubuntu) and run agent-terminal inside it" });
+    add({ id: "platform", status: "fail", message: "Windows is not supported natively", fix: "Use WSL2 (Ubuntu) and run tmux-terminals inside it" });
   } else {
     add({ id: "platform", status: "ok", message: process.platform });
   }
@@ -111,7 +111,7 @@ export async function runDoctor(opts: DoctorOptions = {}): Promise<Report> {
     loaded = loadConfig({ flags: opts.flags, env, create: false });
     add({ id: "config", status: "ok", message: fs.existsSync(loaded.configFile) ? `config ok (${loaded.configFile})` : `no config file yet; ${loaded.configFile} is created on first run` });
   } catch (e) {
-    add({ id: "config", status: "fail", message: e instanceof ConfigError ? e.message : `config error: ${(e as Error).message}`, fix: "Fix or delete the offending setting in config.json (or the AGENT_TERMINAL_* variable)" });
+    add({ id: "config", status: "fail", message: e instanceof ConfigError ? e.message : `config error: ${(e as Error).message}`, fix: "Fix or delete the offending setting in config.json (or the TMUX_TERMINALS_* variable)" });
     return finish(checks);
   }
   const { config, configFile } = loaded;
@@ -130,8 +130,8 @@ export async function runDoctor(opts: DoctorOptions = {}): Promise<Report> {
   } else if (free.code === "EADDRINUSE") {
     const h = await probeHealth(config.host, config.port, scheme);
     add(h.ok
-      ? { id: "port", status: "ok", message: `${config.host}:${config.port} is served by agent-terminal ${h.version ?? ""} (already running)`.trim() }
-      : { id: "port", status: "fail", message: `${config.host}:${config.port} is in use by another program`, fix: `Pick another port: agent-terminal --port 8800 (or set "port" in ${configFile})` });
+      ? { id: "port", status: "ok", message: `${config.host}:${config.port} is served by tmux-terminals ${h.version ?? ""} (already running)`.trim() }
+      : { id: "port", status: "fail", message: `${config.host}:${config.port} is in use by another program`, fix: `Pick another port: tmux-terminals --port 8800 (or set "port" in ${configFile})` });
   } else {
     add({ id: "port", status: "fail", message: `cannot bind ${config.host}:${config.port} (${free.code})`, fix: "Check the host address and port permissions (ports < 1024 need root)" });
   }
@@ -172,11 +172,11 @@ function finish(checks: Check[]): Report {
 
 export function formatReport(r: Report): string {
   const mark = { ok: "ok  ", warn: "warn", fail: "FAIL" } as const;
-  const lines = [`agent-terminal ${r.version} doctor (node ${r.node}, ${r.platform})`, ""];
+  const lines = [`tmux-terminals ${r.version} doctor (node ${r.node}, ${r.platform})`, ""];
   for (const c of r.checks) {
     lines.push(`[${mark[c.status]}] ${c.message}`);
     if (c.fix && c.status !== "ok") lines.push(`       fix: ${c.fix}`);
   }
-  lines.push("", r.ok ? "All required checks passed." : "Some checks failed; apply the fixes above and re-run `agent-terminal doctor`.");
+  lines.push("", r.ok ? "All required checks passed." : "Some checks failed; apply the fixes above and re-run `tmux-terminals doctor`.");
   return lines.join("\n");
 }

@@ -18,7 +18,7 @@ export function systemdUnit(spec: ServiceSpec): string {
   const exec = [spec.node, spec.script, "start", ...spec.args].map(sdQuote).join(" ");
   return [
     "[Unit]",
-    "Description=Agent Terminal (web terminal for coding agents)",
+    "Description=Tmux Terminals (web terminal for coding agents)",
     "After=network-online.target",
     "Wants=network-online.target",
     "",
@@ -39,7 +39,7 @@ export function systemdUnit(spec: ServiceSpec): string {
 
 const xml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-export function launchdPlist(spec: ServiceSpec, label = "dev.agent-terminal"): string {
+export function launchdPlist(spec: ServiceSpec, label = "com.axoinsights.tmux-terminals"): string {
   const argv = [spec.node, spec.script, "start", ...spec.args].map((a) => `    <string>${xml(a)}</string>`).join("\n");
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -73,15 +73,15 @@ export function installService(spec: ServiceSpec, opts: { dryRun?: boolean; forc
   const platform = opts.platform ?? process.platform;
   const home = opts.home ?? os.homedir();
   if (platform === "linux") {
-    const file = path.join(home, ".config", "systemd", "user", "agent-terminal.service");
+    const file = path.join(home, ".config", "systemd", "user", "tmux-terminals.service");
     const content = systemdUnit(spec);
-    const commands = ["systemctl --user daemon-reload", "systemctl --user enable --now agent-terminal", "loginctl enable-linger \"$USER\"   # optional: keep it running after you log out"];
+    const commands = ["systemctl --user daemon-reload", "systemctl --user enable --now tmux-terminals", "loginctl enable-linger \"$USER\"   # optional: keep it running after you log out"];
     return { platform: "linux", file, content, wrote: write(file, content, opts), commands };
   }
   if (platform === "darwin") {
-    const file = path.join(home, "Library", "LaunchAgents", "dev.agent-terminal.plist");
+    const file = path.join(home, "Library", "LaunchAgents", "com.axoinsights.tmux-terminals.plist");
     const content = launchdPlist(spec);
-    const commands = [`launchctl bootstrap gui/$(id -u) ${file}`, "launchctl kickstart -k gui/$(id -u)/dev.agent-terminal"];
+    const commands = [`launchctl bootstrap gui/$(id -u) ${file}`, "launchctl kickstart -k gui/$(id -u)/com.axoinsights.tmux-terminals"];
     return { platform: "darwin", file, content, wrote: write(file, content, opts), commands };
   }
   throw new Error(`install-service supports Linux (systemd) and macOS (launchd); on ${platform} use WSL.`);

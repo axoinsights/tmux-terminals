@@ -1,7 +1,7 @@
-# Sandbox option: agent-terminal and its agents run inside this container, working in ./workspace.
+# Sandbox option: tmux-terminals and its agents run inside this container, working in ./workspace.
 # Published on 127.0.0.1 only; put `tailscale serve` (or another TLS proxy) in front for your phone.
 services:
-  agent-terminal:
+  tmux-terminals:
     build:
       context: .
       args:
@@ -14,10 +14,10 @@ services:
       - "127.0.0.1:8767:8767"
     volumes:
       - ./workspace:/workspace
-      - agent-terminal-config:/home/node/.config/agent-terminal
+      - tmux-terminals-config:/home/node/.config/tmux-terminals
     environment:
       # Optional: pin the access token instead of generating one (>= 16 chars).
-      # AGENT_TERMINAL_TOKEN: ${AGENT_TERMINAL_TOKEN:-}
-      AGENT_TERMINAL_CWD_PRESETS: /workspace
+      # TMUX_TERMINALS_TOKEN: ${TMUX_TERMINALS_TOKEN:-}
+      TMUX_TERMINALS_CWD_PRESETS: /workspace
 volumes:
-  agent-terminal-config:
+  tmux-terminals-config:

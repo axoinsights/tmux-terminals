@@ -5,7 +5,7 @@ Thanks for helping. The project aims to stay small and boring: Node + TypeScript
 ## Setup
 
 ```bash
-git clone <repo-url> && cd agent-terminal
+git clone https://github.com/axoinsights/tmux-terminals.git && cd tmux-terminals
 npm install          # installs deps and compiles src/ to dist/
 npm run build        # after editing src/*.ts
 npm test             # build + unit tests + browser end-to-end

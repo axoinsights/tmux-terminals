@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content" />
-<title>Agent Terminal</title>
+<title>Tmux Terminals</title>
 <link rel="stylesheet" href="/vendor/xterm.css" />
 <link rel="manifest" href="/manifest.webmanifest" />
 <meta name="theme-color" content="#12121a" />
 <!-- iOS home-screen support (Apple ignores the web manifest for most of this) -->
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<meta name="apple-mobile-web-app-title" content="Agent Terminal" />
+<meta name="apple-mobile-web-app-title" content="Tmux Terminals" />
 <link rel="apple-touch-icon" href="/icons/icon-192.png" />
 <style>
   :root {
@@ -273,7 +273,7 @@
   <div id="sidebar-backdrop"></div>
   <div id="sidebar" class="mobile-hidden">
     <div id="sidebar-header">
-      <h1>Agent Terminal</h1>
+      <h1>Tmux Terminals</h1>
       <div id="conn-dot" title="disconnected"></div>
     </div>
     <div id="session-list" role="list"></div>
@@ -423,15 +423,15 @@
 
   // Font size: shared across all sessions/tabs (persisted so it survives reloads).
   const FONT_MIN = 9, FONT_MAX = 22;
-  let fontSize = parseInt(localStorage.getItem("agent_terminal_font_size"), 10) || 13;
+  let fontSize = parseInt(localStorage.getItem("tmux_terminals_font_size"), 10) || 13;
 
   // Custom session names: client-side labels keyed by session id, since the
   // server only knows kind+cwd. Persisted so a rename survives reconnects
   // and page reloads (sessions themselves persist server-side too).
   let customNames = {};
-  try { customNames = JSON.parse(localStorage.getItem("agent_terminal_names") || "{}"); } catch (_) { customNames = {}; }
+  try { customNames = JSON.parse(localStorage.getItem("tmux_terminals_names") || "{}"); } catch (_) { customNames = {}; }
   function saveCustomNames() {
-    try { localStorage.setItem("agent_terminal_names", JSON.stringify(customNames)); } catch (_) {}
+    try { localStorage.setItem("tmux_terminals_names", JSON.stringify(customNames)); } catch (_) {}
   }
   function displayName(entry) {
     // Server-side title (set via pty_rename, shared across devices) wins;
@@ -884,7 +884,7 @@
   // session you are typing in never nags. Detected client-side because
   // visibility is a client fact; every attached tab does its own detection.
   const QUIET_MS = 8000, NOTIFY_COOLDOWN_MS = 30000;
-  const NOTIFY_KEY = "agent_terminal_notify";
+  const NOTIFY_KEY = "tmux_terminals_notify";
   let notifyOn = false;
   try { notifyOn = localStorage.getItem(NOTIFY_KEY) === "1"; } catch (_) {}
   const notifyBtn = el("notify-toggle");
@@ -916,7 +916,7 @@
   }
   function updateTitleBadge() {
     const n = [...sessions.values()].filter((s) => s.waiting).length;
-    document.title = (n ? `(${n}) ` : "") + "Agent Terminal";
+    document.title = (n ? `(${n}) ` : "") + "Tmux Terminals";
   }
   function clearWaiting(entry) {
     if (!entry.waiting) return;
@@ -1302,7 +1302,7 @@
   // Recently launched working directories, newest first, shown ahead of the
   // static presets. localStorage can throw (private mode / blocked), so every
   // access is wrapped and the dialog works fine without it.
-  const RECENT_KEY = "agent_terminal_recent_cwds", RECENT_MAX = 6;
+  const RECENT_KEY = "tmux_terminals_recent_cwds", RECENT_MAX = 6;
   function loadRecentCwds() {
     try { const a = JSON.parse(localStorage.getItem(RECENT_KEY) || "[]"); return Array.isArray(a) ? a.filter((x) => typeof x === "string") : []; } catch (_) { return []; }
   }
@@ -1468,7 +1468,7 @@
 
   // ─── Font size (shared across all sessions, persisted) ──────────────
   function applyFontSize() {
-    localStorage.setItem("agent_terminal_font_size", String(fontSize));
+    localStorage.setItem("tmux_terminals_font_size", String(fontSize));
     for (const s of sessions.values()) {
       s.term.options.fontSize = fontSize;
       s.fit.fit();

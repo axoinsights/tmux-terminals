@@ -1,5 +1,5 @@
 /**
- * Configuration: CLI flags > AGENT_TERMINAL_* env vars > <configDir>/config.json > defaults.
+ * Configuration: CLI flags > TMUX_TERMINALS_* env vars > <configDir>/config.json > defaults.
  * The config file is created on first run (mode 600) and holds the generated access token.
  */
 import * as fs from "node:fs";
@@ -52,7 +52,7 @@ export const DEFAULTS = {
   host: "127.0.0.1",
   port: 8767,
   tls: "auto" as TlsSetting,
-  tmuxSocket: "agent-terminal",
+  tmuxSocket: "tmux-terminals",
   transcribeModel: "whisper-1",
 };
 
@@ -69,9 +69,9 @@ const SOCKET_RE = /^[A-Za-z0-9_.-]{1,64}$/;
 
 export function configDirFor(env: NodeJS.ProcessEnv, flags: Flags = {}): string {
   if (flags["config-dir"]) return path.resolve(flags["config-dir"]);
-  if (env.AGENT_TERMINAL_CONFIG_DIR) return path.resolve(env.AGENT_TERMINAL_CONFIG_DIR);
+  if (env.TMUX_TERMINALS_CONFIG_DIR) return path.resolve(env.TMUX_TERMINALS_CONFIG_DIR);
   const base = env.XDG_CONFIG_HOME && path.isAbsolute(env.XDG_CONFIG_HOME) ? env.XDG_CONFIG_HOME : path.join(os.homedir(), ".config");
-  return path.join(base, "agent-terminal");
+  return path.join(base, "tmux-terminals");
 }
 
 /** First executable named `cmd` on PATH (or `cmd` itself when it contains a slash). */
@@ -130,7 +130,7 @@ export function validateAgents(raw: unknown): AgentDef[] {
 
 export function validateSocket(name: unknown, what: string): string {
   if (typeof name !== "string" || !SOCKET_RE.test(name)) throw new ConfigError(`${what} must match ${SOCKET_RE} (a tmux -L socket name, not a path)`);
-  if (name === "default") throw new ConfigError(`${what} must not be "default": that is your own tmux server, which agent-terminal never touches`);
+  if (name === "default") throw new ConfigError(`${what} must not be "default": that is your own tmux server, which tmux-terminals never touches`);
   return name;
 }
 
@@ -218,36 +218,36 @@ export function loadConfig(opts: LoadOptions = {}): LoadedConfig {
     return undefined;
   };
 
-  const host = (pick(flags.host, "AGENT_TERMINAL_HOST", "host")?.v ?? DEFAULTS.host) as string;
+  const host = (pick(flags.host, "TMUX_TERMINALS_HOST", "host")?.v ?? DEFAULTS.host) as string;
   if (typeof host !== "string" || !host.trim()) throw new ConfigError("host must be a non-empty string");
-  const port = parsePort(pick(flags.port, "AGENT_TERMINAL_PORT", "port")?.v ?? DEFAULTS.port, "port");
-  const tlsPick = pick(flags.tls, "AGENT_TERMINAL_TLS", "tls");
+  const port = parsePort(pick(flags.port, "TMUX_TERMINALS_PORT", "port")?.v ?? DEFAULTS.port, "port");
+  const tlsPick = pick(flags.tls, "TMUX_TERMINALS_TLS", "tls");
   const tls = tlsPick ? parseTls(tlsPick.v, "tls") : DEFAULTS.tls;
-  const tmuxSocket = validateSocket(pick(flags["tmux-socket"], "AGENT_TERMINAL_TMUX_SOCKET", "tmuxSocket")?.v ?? DEFAULTS.tmuxSocket, "tmuxSocket");
+  const tmuxSocket = validateSocket(pick(flags["tmux-socket"], "TMUX_TERMINALS_TMUX_SOCKET", "tmuxSocket")?.v ?? DEFAULTS.tmuxSocket, "tmuxSocket");
 
   let agentsRaw: unknown;
-  if (env.AGENT_TERMINAL_AGENTS) agentsRaw = parseJsonEnv("AGENT_TERMINAL_AGENTS", env.AGENT_TERMINAL_AGENTS);
+  if (env.TMUX_TERMINALS_AGENTS) agentsRaw = parseJsonEnv("TMUX_TERMINALS_AGENTS", env.TMUX_TERMINALS_AGENTS);
   else if (file.agents !== undefined) agentsRaw = file.agents;
   const agents = agentsRaw === undefined ? defaultAgents(env, opts.find) : validateAgents(agentsRaw);
 
   let groupsRaw: unknown = file.groups;
-  if (env.AGENT_TERMINAL_GROUPS) groupsRaw = parseJsonEnv("AGENT_TERMINAL_GROUPS", env.AGENT_TERMINAL_GROUPS);
+  if (env.TMUX_TERMINALS_GROUPS) groupsRaw = parseJsonEnv("TMUX_TERMINALS_GROUPS", env.TMUX_TERMINALS_GROUPS);
   const groups = validateGroups(groupsRaw, tmuxSocket);
 
   let cwdPresets: string[] = ["~"];
-  if (env.AGENT_TERMINAL_CWD_PRESETS) cwdPresets = env.AGENT_TERMINAL_CWD_PRESETS.split(",").map((s) => s.trim()).filter(Boolean);
+  if (env.TMUX_TERMINALS_CWD_PRESETS) cwdPresets = env.TMUX_TERMINALS_CWD_PRESETS.split(",").map((s) => s.trim()).filter(Boolean);
   else if (file.cwdPresets !== undefined) cwdPresets = strArray(file.cwdPresets, "cwdPresets");
 
-  const transcribeUrl = (env.AGENT_TERMINAL_TRANSCRIBE_URL || (file.transcribeUrl as string | undefined)) || undefined;
+  const transcribeUrl = (env.TMUX_TERMINALS_TRANSCRIBE_URL || (file.transcribeUrl as string | undefined)) || undefined;
   if (transcribeUrl !== undefined && !/^https?:\/\//.test(String(transcribeUrl))) throw new ConfigError("transcribeUrl must be an http(s) URL");
-  const transcribeModel = String(env.AGENT_TERMINAL_TRANSCRIBE_MODEL || file.transcribeModel || DEFAULTS.transcribeModel);
-  const transcribeApiKey = (env.AGENT_TERMINAL_TRANSCRIBE_API_KEY || (file.transcribeApiKey as string | undefined)) || undefined;
+  const transcribeModel = String(env.TMUX_TERMINALS_TRANSCRIBE_MODEL || file.transcribeModel || DEFAULTS.transcribeModel);
+  const transcribeApiKey = (env.TMUX_TERMINALS_TRANSCRIBE_API_KEY || (file.transcribeApiKey as string | undefined)) || undefined;
 
   // Token: env > file > generated. (Never a flag: argv is visible in `ps`.)
   let token = "";
   let tokenSource: LoadedConfig["tokenSource"] = "generated";
-  if (env.AGENT_TERMINAL_TOKEN) {
-    token = env.AGENT_TERMINAL_TOKEN;
+  if (env.TMUX_TERMINALS_TOKEN) {
+    token = env.TMUX_TERMINALS_TOKEN;
     tokenSource = "env";
   } else if (typeof file.token === "string" && file.token) {
     token = file.token;
@@ -271,7 +271,7 @@ export function loadConfig(opts: LoadOptions = {}): LoadedConfig {
     fs.mkdirSync(configDir, { recursive: true, mode: 0o700 });
   }
 
-  const stateDir = path.resolve(env.AGENT_TERMINAL_STATE_DIR || configDir);
+  const stateDir = path.resolve(env.TMUX_TERMINALS_STATE_DIR || configDir);
   return {
     config: { host, port, token, tls, agents, tmuxSocket, groups, transcribeUrl, transcribeModel, transcribeApiKey, cwdPresets },
     configDir,

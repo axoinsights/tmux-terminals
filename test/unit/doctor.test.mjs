@@ -11,7 +11,7 @@ const freePort = () => new Promise((res) => { const s = net.createServer(); s.li
 
 test("healthy environment: ok, JSON-serialisable, every check has a status", async () => {
   const port = await freePort();
-  const r = await runDoctor({ flags: { port: String(port) }, env: { ...process.env, AGENT_TERMINAL_CONFIG_DIR: tmp() } });
+  const r = await runDoctor({ flags: { port: String(port) }, env: { ...process.env, TMUX_TERMINALS_CONFIG_DIR: tmp() } });
   assert.equal(r.ok, true, formatReport(r));
   assert.ok(r.checks.length >= 8);
   for (const c of r.checks) assert.ok(["ok", "warn", "fail"].includes(c.status));
@@ -21,7 +21,7 @@ test("healthy environment: ok, JSON-serialisable, every check has a status", asy
 
 test("missing tmux is a failure with an install hint", async () => {
   const port = await freePort();
-  const r = await runDoctor({ flags: { port: String(port) }, env: { AGENT_TERMINAL_CONFIG_DIR: tmp(), PATH: "/nonexistent", SHELL: "/bin/sh" } });
+  const r = await runDoctor({ flags: { port: String(port) }, env: { TMUX_TERMINALS_CONFIG_DIR: tmp(), PATH: "/nonexistent", SHELL: "/bin/sh" } });
   const c = r.checks.find((x) => x.id === "tmux");
   assert.equal(c.status, "fail");
   assert.match(c.fix, /apt-get install -y tmux/);
@@ -32,7 +32,7 @@ test("port in use by another program is a failure; our own server would be ok", 
   const blocker = net.createServer();
   await new Promise((res) => blocker.listen(0, "127.0.0.1", res));
   const port = blocker.address().port;
-  const r = await runDoctor({ flags: { port: String(port) }, env: { ...process.env, AGENT_TERMINAL_CONFIG_DIR: tmp() } });
+  const r = await runDoctor({ flags: { port: String(port) }, env: { ...process.env, TMUX_TERMINALS_CONFIG_DIR: tmp() } });
   blocker.close();
   const c = r.checks.find((x) => x.id === "port");
   assert.equal(c.status, "fail");
@@ -42,7 +42,7 @@ test("port in use by another program is a failure; our own server would be ok", 
 test("invalid config is reported, not thrown", async () => {
   const dir = tmp();
   fs.writeFileSync(path.join(dir, "config.json"), "{ not json");
-  const r = await runDoctor({ env: { ...process.env, AGENT_TERMINAL_CONFIG_DIR: dir } });
+  const r = await runDoctor({ env: { ...process.env, TMUX_TERMINALS_CONFIG_DIR: dir } });
   assert.equal(r.ok, false);
   assert.equal(r.checks.find((x) => x.id === "config").status, "fail");
 });
@@ -52,6 +52,6 @@ test("world-readable config file is flagged (it holds the token)", async () => {
   fs.writeFileSync(path.join(dir, "config.json"), JSON.stringify({ token: "t".repeat(24) }), { mode: 0o644 });
   fs.chmodSync(path.join(dir, "config.json"), 0o644);
   const port = await freePort();
-  const r = await runDoctor({ flags: { port: String(port) }, env: { ...process.env, AGENT_TERMINAL_CONFIG_DIR: dir } });
+  const r = await runDoctor({ flags: { port: String(port) }, env: { ...process.env, TMUX_TERMINALS_CONFIG_DIR: dir } });
   assert.equal(r.checks.find((x) => x.id === "config-perms").status, "warn");
 });

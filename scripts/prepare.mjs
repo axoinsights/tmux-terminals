@@ -8,7 +8,7 @@ import path from "node:path";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const tsc = path.join(root, "node_modules", ".bin", process.platform === "win32" ? "tsc.cmd" : "tsc");
 if (!existsSync(tsc)) {
-  if (!existsSync(path.join(root, "dist", "cli.js"))) console.warn("agent-terminal: typescript not installed and dist/ missing; run `npm install` with devDependencies.");
+  if (!existsSync(path.join(root, "dist", "cli.js"))) console.warn("tmux-terminals: typescript not installed and dist/ missing; run `npm install` with devDependencies.");
   process.exit(0);
 }
 const r = spawnSync(tsc, [], { cwd: root, stdio: "inherit" });

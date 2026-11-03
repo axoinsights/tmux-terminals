@@ -5,9 +5,9 @@ import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 
-const BIN = path.resolve("bin/agent-terminal.mjs");
+const BIN = path.resolve("bin/tmux-terminals.mjs");
 const run = (args, dir, extraEnv = {}) =>
-  spawnSync(process.execPath, [BIN, ...args], { encoding: "utf8", env: { ...process.env, AGENT_TERMINAL_CONFIG_DIR: dir, AGENT_TERMINAL_TOKEN: "", ...extraEnv } });
+  spawnSync(process.execPath, [BIN, ...args], { encoding: "utf8", env: { ...process.env, TMUX_TERMINALS_CONFIG_DIR: dir, TMUX_TERMINALS_TOKEN: "", ...extraEnv } });
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), "at-cli-"));
 
 test("--help and --version work and exit 0; unknown commands exit 2", () => {
@@ -36,7 +36,7 @@ test("config show hides the token; config set validates and rolls back bad value
   assert.equal(JSON.parse(fs.readFileSync(path.join(d, "config.json"), "utf8")).port, 9100);
   assert.notEqual(run(["config", "set", "port", "abc"], d).status, 0);
   assert.notEqual(run(["config", "set", "tmuxSocket", "default"], d).status, 0);
-  assert.equal(JSON.parse(fs.readFileSync(path.join(d, "config.json"), "utf8")).tmuxSocket, "agent-terminal");
+  assert.equal(JSON.parse(fs.readFileSync(path.join(d, "config.json"), "utf8")).tmuxSocket, "tmux-terminals");
   assert.notEqual(run(["config", "set", "token", "x"], d).status, 0, "the token cannot be set through argv");
 });
 

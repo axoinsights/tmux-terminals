@@ -30,7 +30,7 @@ const mains = ["alpha", "bravo", "charlie"].map((title, i) => ({ id: crypto.rand
 tmux(HUB, "-f", conf, "start-server");
 for (const h of mains) tmux(HUB, "-f", conf, "new-session", "-d", "-s", "at-" + h.id, "-x", "100", "-y", "30", "-c", TMP, "cat");
 fs.writeFileSync(REG, JSON.stringify(mains.map((h) => ({ id: h.id, agent: "shell", cwd: TMP, title: h.title, titleCustom: true, startedAt: h.startedAt }))));
-const ccNew = (id, title) => { tmux(CC, "-f", conf, "new-session", "-d", "-s", id, "-x", "120", "-y", "40", "-c", TMP, "cat"); tmux(CC, "set-option", "-t", id, "@agent_terminal_title", title); };
+const ccNew = (id, title) => { tmux(CC, "-f", conf, "new-session", "-d", "-s", id, "-x", "120", "-y", "40", "-c", TMP, "cat"); tmux(CC, "set-option", "-t", id, "@tmux_terminals_title", title); };
 tmux(CC, "-f", conf, "start-server");
 ccNew("cc-aaaaaa", "agent task · fix the flaky test"); await sleep(1100); // distinct session_created seconds
 ccNew("cc-bbbbbb", "agent task · add dark mode");

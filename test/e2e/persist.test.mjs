@@ -41,10 +41,10 @@ try {
   const s1 = await spawnAgent(c, { agent: "shell" });
   check("shell agent spawns in the requested directory", s1 && s1.cwd === sb.tmp && s1.agent === "shell", JSON.stringify(s1));
   await sleep(600);
-  c.send({ type: "pty_input", sessionId: s1.id, data: 'echo "ENV[${AGENT_TERMINAL_TOKEN:-unset}|${AGENT_TERMINAL_PORT:-unset}]"; env | grep -c AGENT_TERMINAL_ | sed s/^/COUNT=/\r' });
+  c.send({ type: "pty_input", sessionId: s1.id, data: 'echo "ENV[${TMUX_TERMINALS_TOKEN:-unset}|${TMUX_TERMINALS_PORT:-unset}]"; env | grep -c TMUX_TERMINALS_ | sed s/^/COUNT=/\r' });
   await until(() => /COUNT=\d/.test(c.out.get(s1.id) || ""), 8000, "env output");
   const out1 = c.out.get(s1.id);
-  check("spawned process gets a clean env (no AGENT_TERMINAL_*)", out1.includes("ENV[unset|unset]") && out1.includes("COUNT=0"), JSON.stringify(out1.slice(-300)));
+  check("spawned process gets a clean env (no TMUX_TERMINALS_*)", out1.includes("ENV[unset|unset]") && out1.includes("COUNT=0"), JSON.stringify(out1.slice(-300)));
   c.send({ type: "pty_input", sessionId: s1.id, data: "echo PERSIST_$((20+22))\r" });
   await until(() => (c.out.get(s1.id) || "").includes("PERSIST_42"), 8000, "persist marker");
 

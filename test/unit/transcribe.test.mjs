@@ -24,8 +24,8 @@ test("dictation: audio is forwarded to the OpenAI-compatible endpoint and the te
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "at-tr-"));
   const { config } = loadConfig({
     env: {
-      AGENT_TERMINAL_CONFIG_DIR: dir, AGENT_TERMINAL_TOKEN: token, AGENT_TERMINAL_TMUX_SOCKET: `at-unit-tr-${process.pid}`,
-      AGENT_TERMINAL_TRANSCRIBE_URL: `http://127.0.0.1:${backend.address().port}/v1/audio/transcriptions`, AGENT_TERMINAL_TRANSCRIBE_API_KEY: "sk-test",
+      TMUX_TERMINALS_CONFIG_DIR: dir, TMUX_TERMINALS_TOKEN: token, TMUX_TERMINALS_TMUX_SOCKET: `at-unit-tr-${process.pid}`,
+      TMUX_TERMINALS_TRANSCRIBE_URL: `http://127.0.0.1:${backend.address().port}/v1/audio/transcriptions`, TMUX_TERMINALS_TRANSCRIBE_API_KEY: "sk-test",
     },
   });
   const srv = await startServer({ config: { ...config, port: 0 }, stateDir: dir });

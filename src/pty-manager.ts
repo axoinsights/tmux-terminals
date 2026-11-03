@@ -160,12 +160,12 @@ export class PtyManager {
     return { ok: r.status === 0, out: (r.stdout || "").trim() };
   }
 
-  /** Env for tmux and everything it starts: ours minus AGENT_TERMINAL_*, TMUX*. */
+  /** Env for tmux and everything it starts: ours minus TMUX_TERMINALS_*, TMUX*. */
   cleanEnv(): Record<string, string> {
     const env: Record<string, string> = {};
     for (const [k, v] of Object.entries(process.env)) {
       if (v === undefined) continue;
-      if (k.startsWith("AGENT_TERMINAL_") || k === "TMUX" || k === "TMUX_PANE") continue;
+      if (k.startsWith("TMUX_TERMINALS_") || k === "TMUX" || k === "TMUX_PANE") continue;
       env[k] = v;
     }
     env.TERM = "xterm-256color";
@@ -308,7 +308,7 @@ export class PtyManager {
     let n = 0;
     const SEP = "|::|"; // tmux prints a tab (and, without a UTF-8 locale, non-ASCII) as "_"; -u keeps titles intact
     this.groups.forEach((g, gi) => {
-      const listed = this.tmux(["-u", "list-sessions", "-F", ["#{session_name}", "#{window_width}", "#{window_height}", "#{session_created}", "#{pane_current_path}", "#{@agent_terminal_title}"].join(SEP)], g.socket);
+      const listed = this.tmux(["-u", "list-sessions", "-F", ["#{session_name}", "#{window_width}", "#{window_height}", "#{session_created}", "#{pane_current_path}", "#{@tmux_terminals_title}"].join(SEP)], g.socket);
       if (!listed.ok) return;
       for (const line of listed.out.split("\n")) {
         const [name, w, h, created, cwd, ...t] = line.split(SEP), title = t.join(SEP);

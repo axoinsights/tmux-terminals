@@ -9,7 +9,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
-export const BIN = path.join(ROOT, "bin", "agent-terminal.mjs");
+export const BIN = path.join(ROOT, "bin", "tmux-terminals.mjs");
 export const TMUX_CONF = path.join(ROOT, "tmux.conf");
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -61,14 +61,14 @@ export async function startApp(sb, { port, groups, agents, pathPrepend, extraEnv
   const env = {
     ...process.env,
     ...(pathPrepend ? { PATH: `${pathPrepend}:${process.env.PATH}` } : {}),
-    AGENT_TERMINAL_CONFIG_DIR: sb.configDir,
-    AGENT_TERMINAL_PORT: String(port),
-    AGENT_TERMINAL_HOST: "127.0.0.1",
-    AGENT_TERMINAL_TOKEN: sb.token,
-    AGENT_TERMINAL_TMUX_SOCKET: sb.socket,
-    AGENT_TERMINAL_GROUP_POLL_MS: "400",
-    ...(groups ? { AGENT_TERMINAL_GROUPS: JSON.stringify(groups) } : {}),
-    ...(agents ? { AGENT_TERMINAL_AGENTS: JSON.stringify(agents) } : {}),
+    TMUX_TERMINALS_CONFIG_DIR: sb.configDir,
+    TMUX_TERMINALS_PORT: String(port),
+    TMUX_TERMINALS_HOST: "127.0.0.1",
+    TMUX_TERMINALS_TOKEN: sb.token,
+    TMUX_TERMINALS_TMUX_SOCKET: sb.socket,
+    TMUX_TERMINALS_GROUP_POLL_MS: "400",
+    ...(groups ? { TMUX_TERMINALS_GROUPS: JSON.stringify(groups) } : {}),
+    ...(agents ? { TMUX_TERMINALS_AGENTS: JSON.stringify(agents) } : {}),
     ...extraEnv,
   };
   const app = { port, logs: "", proc: null, sb, base: `http://127.0.0.1:${port}` };

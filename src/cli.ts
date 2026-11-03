@@ -1,4 +1,4 @@
-/** agent-terminal CLI: start | doctor | token | install-service | stop | status | --help */
+/** tmux-terminals CLI: start | doctor | token | install-service | stop | status | --help */
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { spawn } from "node:child_process";
@@ -13,33 +13,33 @@ import { runSmoke } from "./smoke.js";
 import { ensureSelfSigned } from "./tls.js";
 import { readVersion } from "./version.js";
 
-const HELP = `agent-terminal ${readVersion()} - web terminal for coding agents running in tmux
+const HELP = `tmux-terminals ${readVersion()} - web terminal for coding agents running in tmux
 
 Usage:
-  agent-terminal [start] [options]    Start the server (foreground)
-  agent-terminal start --daemon       Start in the background (pid + log in the state dir)
-  agent-terminal stop                 Stop a --daemon instance (agent sessions keep running in tmux)
-  agent-terminal status               Show whether it is running
-  agent-terminal doctor [--json]      Check node, tmux, node-pty, config, port, TLS; exit 1 on problems
-  agent-terminal token [--url|--qr]   Print the access token (or pairing URL / QR code)
-  agent-terminal smoke [--json]       Test a running server end to end (auth, WebSocket, shell echo)
-  agent-terminal config show|path|set <key> <value>
+  tmux-terminals [start] [options]    Start the server (foreground)
+  tmux-terminals start --daemon       Start in the background (pid + log in the state dir)
+  tmux-terminals stop                 Stop a --daemon instance (agent sessions keep running in tmux)
+  tmux-terminals status               Show whether it is running
+  tmux-terminals doctor [--json]      Check node, tmux, node-pty, config, port, TLS; exit 1 on problems
+  tmux-terminals token [--url|--qr]   Print the access token (or pairing URL / QR code)
+  tmux-terminals smoke [--json]       Test a running server end to end (auth, WebSocket, shell echo)
+  tmux-terminals config show|path|set <key> <value>
                                       Show (token redacted), locate, or change scalar settings in config.json
-  agent-terminal install-service      Write a systemd user unit (Linux) or launchd agent (macOS); prints how to enable it
-  agent-terminal --help | --version
+  tmux-terminals install-service      Write a systemd user unit (Linux) or launchd agent (macOS); prints how to enable it
+  tmux-terminals --help | --version
 
-Options (flags > AGENT_TERMINAL_* env vars > config.json):
+Options (flags > TMUX_TERMINALS_* env vars > config.json):
   --host <addr>          Bind address (default 127.0.0.1; use 0.0.0.0 to serve your LAN, with TLS)
   --port <n>             Port (default 8767)
   --tls <auto|off|cert.pem,key.pem>
                          auto = self-signed certificate when the host is not loopback (default)
-  --tmux-socket <name>   Dedicated tmux socket name (default agent-terminal; "default" is refused)
-  --config-dir <dir>     Config directory (default ~/.config/agent-terminal)
+  --tmux-socket <name>   Dedicated tmux socket name (default tmux-terminals; "default" is refused)
+  --config-dir <dir>     Config directory (default ~/.config/tmux-terminals)
   --json                 doctor/token/status: machine-readable output
   --show-token           Print the pairing URL + QR at startup even on a non-TTY / not first run
   --dry-run, --force     install-service: print only / overwrite an existing unit
 
-Config: ${"~/.config/agent-terminal/config.json"} (created on first run, mode 600). Docs: README.md
+Config: ${"~/.config/tmux-terminals/config.json"} (created on first run, mode 600). Docs: README.md
 `;
 
 const OPTIONS = {
@@ -59,10 +59,10 @@ const OPTIONS = {
   version: { type: "boolean", short: "v" },
 } as const;
 
-const SCRIPT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "bin", "agent-terminal.mjs");
+const SCRIPT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "bin", "tmux-terminals.mjs");
 
 function fail(msg: string, code = 1): never {
-  console.error(`agent-terminal: ${msg}`);
+  console.error(`tmux-terminals: ${msg}`);
   process.exit(code);
 }
 
@@ -72,7 +72,7 @@ function exposureHelp(loaded: LoadedConfig): string[] {
   return [
     "Listening on loopback only. To reach it from your phone:",
     `  - Tailscale (HTTPS, no cert warnings):  tailscale serve --bg --https=443 http://127.0.0.1:${port}`,
-    "  - Same Wi-Fi / LAN:                      agent-terminal --host 0.0.0.0   (auto self-signed TLS; accept the browser warning once)",
+    "  - Same Wi-Fi / LAN:                      tmux-terminals --host 0.0.0.0   (auto self-signed TLS; accept the browser warning once)",
   ];
 }
 
@@ -86,14 +86,14 @@ function alive(p: number): boolean {
 async function cmdStart(flags: Flags, v: Record<string, unknown>): Promise<void> {
   const loaded = loadConfig({ flags });
   const { config } = loaded;
-  if (!which("tmux")) fail("tmux is not installed. Install it (apt-get install -y tmux | dnf install tmux | brew install tmux), then run `agent-terminal doctor`.");
+  if (!which("tmux")) fail("tmux is not installed. Install it (apt-get install -y tmux | dnf install tmux | brew install tmux), then run `tmux-terminals doctor`.");
 
   if (v.daemon) {
-    const file = path.join(loaded.stateDir, "agent-terminal.pid");
+    const file = path.join(loaded.stateDir, "tmux-terminals.pid");
     const old = pid(file);
-    if (old && alive(old)) fail(`already running (pid ${old}); stop it with \`agent-terminal stop\``);
+    if (old && alive(old)) fail(`already running (pid ${old}); stop it with \`tmux-terminals stop\``);
     fs.mkdirSync(loaded.stateDir, { recursive: true, mode: 0o700 });
-    const logFile = path.join(loaded.stateDir, "agent-terminal.log");
+    const logFile = path.join(loaded.stateDir, "tmux-terminals.log");
     const log = fs.openSync(logFile, "a", 0o600);
     const args = [SCRIPT, "start"];
     for (const k of ["host", "port", "tls", "tmux-socket", "config-dir"] as const) if (flags[k] !== undefined) args.push(`--${k}`, String(flags[k]));
@@ -111,8 +111,8 @@ async function cmdStart(flags: Flags, v: Record<string, unknown>): Promise<void>
         req.on("timeout", () => { req.destroy(); resolve(false); });
       });
       if (ok) {
-        console.log(`agent-terminal running in the background (pid ${child.pid}), ${baseUrls(config)[0]}`);
-        console.log(`log: ${logFile}\nshow the access token with: agent-terminal token --url`);
+        console.log(`tmux-terminals running in the background (pid ${child.pid}), ${baseUrls(config)[0]}`);
+        console.log(`log: ${logFile}\nshow the access token with: tmux-terminals token --url`);
         return;
       }
     }
@@ -131,23 +131,23 @@ async function cmdStart(flags: Flags, v: Record<string, unknown>): Promise<void>
 
   let running;
   try {
-    running = await startServer({ config, stateDir: loaded.stateDir, tls, groupPollMs: Number(process.env.AGENT_TERMINAL_GROUP_POLL_MS) || undefined });
+    running = await startServer({ config, stateDir: loaded.stateDir, tls, groupPollMs: Number(process.env.TMUX_TERMINALS_GROUP_POLL_MS) || undefined });
   } catch (e) {
     const err = e as NodeJS.ErrnoException;
-    if (err.code === "EADDRINUSE") fail(`${config.host}:${config.port} is already in use. Use --port <n>, or \`agent-terminal doctor\`.`);
+    if (err.code === "EADDRINUSE") fail(`${config.host}:${config.port} is already in use. Use --port <n>, or \`tmux-terminals doctor\`.`);
     throw e;
   }
 
-  console.log(`agent-terminal ${readVersion()} listening on ${running.scheme}://${config.host}:${running.port} (tmux socket "${config.tmuxSocket}", agents: ${config.agents.map((a) => a.id).join(", ")})`);
+  console.log(`tmux-terminals ${readVersion()} listening on ${running.scheme}://${config.host}:${running.port} (tmux socket "${config.tmuxSocket}", agents: ${config.agents.map((a) => a.id).join(", ")})`);
   const showToken = (loaded.firstRun && process.stdout.isTTY) || v["show-token"] === true;
   if (showToken) {
     const urls = pairingUrls(config);
     console.log("\nOpen this on the device you want to use (it contains your access token):");
     for (const u of urls) console.log(`  ${u}`);
     console.log(await qrText(urls[0]));
-    if (loaded.firstRun) console.log("This is shown once. Show it again any time with: agent-terminal token --url   (or --qr)");
+    if (loaded.firstRun) console.log("This is shown once. Show it again any time with: tmux-terminals token --url   (or --qr)");
   } else {
-    console.log("Access token not printed. Show it with: agent-terminal token --url");
+    console.log("Access token not printed. Show it with: tmux-terminals token --url");
   }
   for (const l of exposureHelp(loaded)) console.log(l);
 
@@ -206,13 +206,13 @@ async function main(): Promise<void> {
         const extra: string[] = [];
         for (const k of ["host", "port", "tls", "tmux-socket", "config-dir"] as const) if (flags[k] !== undefined) extra.push(`--${k}`, flags[k]!);
         const res = installService(
-          { node: process.execPath, script: SCRIPT, args: extra, path: process.env.PATH || "/usr/local/bin:/usr/bin:/bin", logFile: path.join(loaded.stateDir, "agent-terminal.log") },
+          { node: process.execPath, script: SCRIPT, args: extra, path: process.env.PATH || "/usr/local/bin:/usr/bin:/bin", logFile: path.join(loaded.stateDir, "tmux-terminals.log") },
           { dryRun: v["dry-run"] === true, force: v.force === true },
         );
         console.log(res.wrote ? `Wrote ${res.file}` : `--- ${res.file} (dry run, nothing written) ---\n${res.content}`);
         console.log("Not enabled yet. To enable and start it, run:");
         for (const c of res.commands) console.log(`  ${c}`);
-        console.log("Then check: agent-terminal status   and   agent-terminal token --url");
+        console.log("Then check: tmux-terminals status   and   tmux-terminals token --url");
         return;
       }
       case "config": {
@@ -222,26 +222,26 @@ async function main(): Promise<void> {
         if (sub === "show") {
           const { token: _t, transcribeApiKey: _k, ...rest } = loaded.config;
           void _t; void _k;
-          console.log(JSON.stringify({ configFile: loaded.configFile, ...rest, token: "(hidden; agent-terminal token)" }, null, 2));
+          console.log(JSON.stringify({ configFile: loaded.configFile, ...rest, token: "(hidden; tmux-terminals token)" }, null, 2));
           return;
         }
         if (sub === "set") {
           const [key, value] = [positionals[2], positionals[3]];
           const scalar = ["host", "port", "tls", "tmuxSocket", "transcribeUrl", "transcribeModel", "transcribeApiKey"];
-          if (!key || value === undefined || !scalar.includes(key)) fail(`usage: agent-terminal config set <${scalar.join("|")}> <value>   (for agents, groups, cwdPresets edit ${loaded.configFile})`, 2);
+          if (!key || value === undefined || !scalar.includes(key)) fail(`usage: tmux-terminals config set <${scalar.join("|")}> <value>   (for agents, groups, cwdPresets edit ${loaded.configFile})`, 2);
           if (key === "port" && !/^\d+$/.test(value)) fail(`port must be a number (got "${value}"); change not applied`);
           const before = fs.readFileSync(loaded.configFile, "utf8");
           const obj = JSON.parse(before) as Record<string, unknown>;
           obj[key] = key === "port" ? Number(value) : key === "tls" && value.includes(",") ? { cert: value.split(",")[0], key: value.split(",")[1] } : value;
           fs.writeFileSync(loaded.configFile, JSON.stringify(obj, null, 2) + "\n", { mode: 0o600 });
-          try { loadConfig({ flags, env: { ...process.env, AGENT_TERMINAL_CONFIG_DIR: loaded.configDir } }); } catch (e) {
+          try { loadConfig({ flags, env: { ...process.env, TMUX_TERMINALS_CONFIG_DIR: loaded.configDir } }); } catch (e) {
             fs.writeFileSync(loaded.configFile, before, { mode: 0o600 });
             fail(`${(e as Error).message} (change not applied)`);
           }
           console.log(`set ${key} in ${loaded.configFile}. Restart for it to take effect.`);
           return;
         }
-        fail("usage: agent-terminal config show|path|set <key> <value>", 2);
+        fail("usage: tmux-terminals config show|path|set <key> <value>", 2);
         return;
       }
       case "smoke": {
@@ -256,7 +256,7 @@ async function main(): Promise<void> {
       }
       case "stop": {
         const loaded = loadConfig({ flags, create: false });
-        const file = path.join(loaded.stateDir, "agent-terminal.pid");
+        const file = path.join(loaded.stateDir, "tmux-terminals.pid");
         const p = pid(file);
         if (!p || !alive(p)) { try { fs.unlinkSync(file); } catch { /* none */ } console.log("not running (no live background instance found)"); return; }
         process.kill(p, "SIGTERM");
@@ -270,7 +270,7 @@ async function main(): Promise<void> {
         const loaded = loadConfig({ flags, create: false });
         const report = await runDoctor({ flags });
         const port = report.checks.find((c) => c.id === "port");
-        const running = !!port && /served by agent-terminal/.test(port.message);
+        const running = !!port && /served by tmux-terminals/.test(port.message);
         if (v.json) console.log(JSON.stringify({ running, url: baseUrls(loaded.config)[0] }));
         else console.log(running ? `running at ${baseUrls(loaded.config)[0]}` : "not running");
         process.exit(running ? 0 : 3);

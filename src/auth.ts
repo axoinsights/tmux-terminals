@@ -1,12 +1,12 @@
 /**
  * Token authentication. The token is accepted from (in order) an `Authorization: Bearer` header,
- * the `at_auth` cookie, or a `?token=` query parameter. There is NO localhost exemption:
+ * the `tmux_terminals_auth` cookie, or a `?token=` query parameter. There is NO localhost exemption:
  * reverse proxies (tailscale serve, nginx, ...) connect from localhost.
  */
 import * as crypto from "node:crypto";
 import type { IncomingMessage } from "node:http";
 
-export const COOKIE_NAME = "at_auth";
+export const COOKIE_NAME = "tmux_terminals_auth";
 
 /** Constant-time string compare (hash first so lengths never leak). */
 export function safeEqual(a: string, b: string): boolean {

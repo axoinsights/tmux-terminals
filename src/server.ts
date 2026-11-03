@@ -60,10 +60,10 @@ const CSP = [
 ].join("; ");
 
 const LOGIN_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Agent Terminal</title><style>body{font:16px system-ui,sans-serif;background:#12121a;color:#d8d8e2;display:grid;place-items:center;min-height:100vh;margin:0}
+<title>Tmux Terminals</title><style>body{font:16px system-ui,sans-serif;background:#12121a;color:#d8d8e2;display:grid;place-items:center;min-height:100vh;margin:0}
 form{display:flex;flex-direction:column;gap:12px;width:min(92vw,360px)}input,button{font:inherit;padding:12px;border-radius:8px;border:1px solid #2c2c3a;background:#1a1a26;color:inherit}
 button{background:#3d63dd;border-color:#3d63dd;color:#fff}p{color:#7a7a8c;font-size:14px;margin:0}</style></head><body>
-<form method="get" action="/"><h1 style="margin:0;font-size:20px">Agent Terminal</h1><p>Enter your access token. Run <code>agent-terminal token</code> on the host to see it.</p>
+<form method="get" action="/"><h1 style="margin:0;font-size:20px">Tmux Terminals</h1><p>Enter your access token. Run <code>tmux-terminals token</code> on the host to see it.</p>
 <input name="token" type="password" autocomplete="current-password" autofocus required placeholder="Access token"><button type="submit">Open</button></form></body></html>`;
 
 export interface RunningServer {
@@ -115,7 +115,7 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
   const vendor = vendorFiles();
   const indexHtml = fs.readFileSync(path.join(WEB_DIR, "index.html"));
   const manifest = JSON.stringify({
-    name: "Agent Terminal", short_name: "Terminal", start_url: "/", scope: "/", display: "standalone",
+    name: "Tmux Terminals", short_name: "Terminal", start_url: "/", scope: "/", display: "standalone",
     background_color: "#12121a", theme_color: "#12121a",
     icons: [
       { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
@@ -254,7 +254,7 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
     if (!result.ok) {
       if (result.status === 429) { json(res, 429, { error: "too many bad tokens, slow down" }, { "Retry-After": String(result.retryAfter ?? 1) }); return; }
       if (method === "GET" && (p === "/" || p === "/index.html") && !req.headers.authorization) { send(res, 401, LOGIN_PAGE, "text/html; charset=utf-8"); return; }
-      json(res, 401, { error: "unauthorized" }, { "WWW-Authenticate": 'Bearer realm="agent-terminal"' });
+      json(res, 401, { error: "unauthorized" }, { "WWW-Authenticate": 'Bearer realm="tmux-terminals"' });
       return;
     }
 
@@ -347,7 +347,7 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
 
   const adopted = pty.adoptExisting();
   pty.watchGroups(broadcastList);
-  if (adopted > 0) console.log(`[agent-terminal] adopted ${adopted} running session(s) from the previous run`);
+  if (adopted > 0) console.log(`[tmux-terminals] adopted ${adopted} running session(s) from the previous run`);
 
   const addr = server.address();
   return {

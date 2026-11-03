@@ -5,11 +5,11 @@ import os from "node:os";
 import path from "node:path";
 import { systemdUnit, launchdPlist, installService } from "../../dist/service.js";
 
-const spec = { node: "/usr/bin/node", script: "/opt/a t/bin/agent-terminal.mjs", args: ["--host", "0.0.0.0"], path: "/usr/bin:/home/u/bin%x", logFile: "/tmp/at.log" };
+const spec = { node: "/usr/bin/node", script: "/opt/a t/bin/tmux-terminals.mjs", args: ["--host", "0.0.0.0"], path: "/usr/bin:/home/u/bin%x", logFile: "/tmp/at.log" };
 
 test("systemd unit quotes paths, escapes %, and keeps agents alive across restarts", () => {
   const u = systemdUnit(spec);
-  assert.match(u, /ExecStart="\/usr\/bin\/node" "\/opt\/a t\/bin\/agent-terminal.mjs" "start" "--host" "0.0.0.0"/);
+  assert.match(u, /ExecStart="\/usr\/bin\/node" "\/opt\/a t\/bin\/tmux-terminals.mjs" "start" "--host" "0.0.0.0"/);
   assert.match(u, /Environment="PATH=\/usr\/bin:\/home\/u\/bin%%x"/);
   assert.match(u, /KillMode=process/);
   assert.match(u, /WantedBy=default.target/);
@@ -32,6 +32,6 @@ test("install-service writes the unit but never enables it; refuses to overwrite
   assert.throws(() => installService(spec, { home, platform: "linux" }), /already exists/);
   assert.equal(installService(spec, { home, platform: "linux", force: true }).wrote, true);
   const mac = installService(spec, { home, platform: "darwin" });
-  assert.match(mac.file, /LaunchAgents\/dev\.agent-terminal\.plist$/);
+  assert.match(mac.file, /LaunchAgents\/com\.axoinsights\.tmux-terminals\.plist$/);
   assert.throws(() => installService(spec, { home, platform: "win32" }), /WSL/);
 });

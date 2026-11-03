@@ -60,7 +60,7 @@ export function ensureSelfSigned(configDir: string, host: string): TlsFiles {
     "x509_extensions=v3",
     "prompt=no",
     "[dn]",
-    "CN=agent-terminal",
+    "CN=tmux-terminals",
     "[v3]",
     "basicConstraints=CA:FALSE",
     "keyUsage=digitalSignature,keyEncipherment",

@@ -1,4 +1,4 @@
-# agent-terminal
+# tmux-terminals
 
 A self-hosted, phone-friendly web terminal for driving coding agents (Claude Code, Codex, aider, pi, or a plain shell) that run in **tmux on your own machine**.
 
@@ -10,7 +10,7 @@ Start an agent on your laptop or server, walk away, and keep steering it from yo
 - **Built for thumbs**: key toolbar (Esc, Tab, arrows, Ctrl-C...), a compose bar for autocorrect/voice typing, Paste / Copy / Screen buttons, select mode, swipe gestures, install as an app (PWA).
 - **Many sessions**: sidebar with rename, kill, drag-and-drop order (shared by all your devices), split view, scrollback search, OSC 52 clipboard.
 - **Safe by default**: random token required on every route (also from localhost), loopback bind, WebSocket origin check, no shell strings, your own tmux server is never touched.
-- **Easy to install, for people and for AI agents**: `npm install`, `agent-terminal doctor --json`, `GET /healthz`. See [AGENTS.md](AGENTS.md).
+- **Easy to install, for people and for AI agents**: `npm install`, `tmux-terminals doctor --json`, `GET /healthz`. See [AGENTS.md](AGENTS.md).
 
 Linux and macOS. On Windows, use WSL2.
 
@@ -19,35 +19,35 @@ Linux and macOS. On Windows, use WSL2.
 You need Node 20+ and tmux (`apt-get install -y tmux`, `dnf install tmux` or `brew install tmux`).
 
 ```bash
-git clone <this-repo-url> agent-terminal && cd agent-terminal
+git clone https://github.com/axoinsights/tmux-terminals.git tmux-terminals && cd tmux-terminals
 npm install          # also builds dist/
 npm start
 ```
 
-On the first run it creates `~/.config/agent-terminal/config.json` (mode 600) with a random access token and prints a URL plus a QR code. Open the URL, press **New session**, pick an agent and a folder.
+On the first run it creates `~/.config/tmux-terminals/config.json` (mode 600) with a random access token and prints a URL plus a QR code. Open the URL, press **New session**, pick an agent and a folder.
 
 ```
-agent-terminal 0.1.0 listening on http://127.0.0.1:8767 (tmux socket "agent-terminal", agents: shell, claude)
+tmux-terminals 0.1.0 listening on http://127.0.0.1:8767 (tmux socket "tmux-terminals", agents: shell, claude)
 Open this on the device you want to use (it contains your access token):
   http://127.0.0.1:8767/?token=...
 ```
 
-Something wrong? `npm run doctor` (or `agent-terminal doctor`) checks Node, tmux, the native pty module, config, port and TLS, and prints the fix for each problem.
+Something wrong? `npm run doctor` (or `tmux-terminals doctor`) checks Node, tmux, the native pty module, config, port and TLS, and prints the fix for each problem.
 
 ### Other ways to install
 
 | Way | Commands |
 | --- | --- |
 | From a git checkout (main path) | `npm install && npm start` |
-| From a tarball (what `npx agent-terminal` will be once published) | `npm pack` then `npx ./agent-terminal-0.1.0.tgz` or `npm install -g ./agent-terminal-0.1.0.tgz` |
+| From a tarball (what `npx tmux-terminals` will be once published) | `npm pack` then `npx ./tmux-terminals-0.1.0.tgz` or `npm install -g ./tmux-terminals-0.1.0.tgz` |
 | In a container (sandbox option) | `docker compose up -d --build`, see [Container](#container-sandbox-option) |
 
-Run it in the background: `agent-terminal start --daemon` (stop with `agent-terminal stop`), or install it as a service: `agent-terminal install-service` (writes a systemd user unit on Linux or a launchd agent on macOS and prints the commands to enable it; it never enables anything silently).
+Run it in the background: `tmux-terminals start --daemon` (stop with `tmux-terminals stop`), or install it as a service: `tmux-terminals install-service` (writes a systemd user unit on Linux or a launchd agent on macOS and prints the commands to enable it; it never enables anything silently).
 
 ## Using it from your phone
 
 1. Make the server reachable (see next section).
-2. On the host run `agent-terminal token --qr` and scan the QR code with the phone camera. The page sets a cookie and redirects to a clean URL, so the token is not left in the address bar or history.
+2. On the host run `tmux-terminals token --qr` and scan the QR code with the phone camera. The page sets a cookie and redirects to a clean URL, so the token is not left in the address bar or history.
 3. Browser menu, "Add to Home screen" / "Install app": it opens full screen like an app.
 
 If you lose the cookie, open the URL again or type the token into the form that appears at `/`.
@@ -59,7 +59,7 @@ By default it binds `127.0.0.1` only. Anyone who has the token gets a shell as y
 **Tailscale (recommended: real HTTPS, nothing exposed to the internet)**
 
 ```bash
-agent-terminal                       # stays on 127.0.0.1:8767
+tmux-terminals                       # stays on 127.0.0.1:8767
 tailscale serve --bg --https=443 http://127.0.0.1:8767
 ```
 
@@ -68,7 +68,7 @@ Open `https://<your-machine>.<tailnet>.ts.net/` on the phone and use the token. 
 **Same Wi-Fi / LAN**
 
 ```bash
-agent-terminal --host 0.0.0.0        # tls: auto generates a self-signed certificate (needs openssl)
+tmux-terminals --host 0.0.0.0        # tls: auto generates a self-signed certificate (needs openssl)
 ```
 
 Browsers warn about the self-signed certificate once; accept it. Microphone and clipboard APIs need HTTPS, which is why `auto` TLS turns on for any non-loopback host. Use `--tls off` only behind a proxy that terminates TLS, or `--tls cert.pem,key.pem` for your own certificate.
@@ -77,21 +77,21 @@ Browsers warn about the self-signed certificate once; accept it. Microphone and 
 
 ## Configuration
 
-Precedence: **CLI flags > `AGENT_TERMINAL_*` environment variables > `~/.config/agent-terminal/config.json` > defaults.** The config directory can be moved with `--config-dir` or `AGENT_TERMINAL_CONFIG_DIR` (it also honours `XDG_CONFIG_HOME`). Order of sessions and the session registry live next to it (`order.json`, `sessions.json`; override with `AGENT_TERMINAL_STATE_DIR`).
+Precedence: **CLI flags > `TMUX_TERMINALS_*` environment variables > `~/.config/tmux-terminals/config.json` > defaults.** The config directory can be moved with `--config-dir` or `TMUX_TERMINALS_CONFIG_DIR` (it also honours `XDG_CONFIG_HOME`). Order of sessions and the session registry live next to it (`order.json`, `sessions.json`; override with `TMUX_TERMINALS_STATE_DIR`).
 
 | Field | Env var | Flag | Default | Meaning |
 | --- | --- | --- | --- | --- |
-| `host` | `AGENT_TERMINAL_HOST` | `--host` | `127.0.0.1` | Bind address. `0.0.0.0` serves the LAN. |
-| `port` | `AGENT_TERMINAL_PORT` | `--port` | `8767` | Port. |
-| `token` | `AGENT_TERMINAL_TOKEN` | none (argv shows in `ps`) | generated | At least 16 characters. Generated on first run into `config.json` (mode 600). |
-| `tls` | `AGENT_TERMINAL_TLS` | `--tls` | `auto` | `auto`: self-signed certificate when host is not loopback. `off`. Or `{ "cert": "...", "key": "..." }` (flag form `cert.pem,key.pem`). |
-| `agents` | `AGENT_TERMINAL_AGENTS` (JSON) | none | see below | What the "New session" dialog offers. |
-| `tmuxSocket` | `AGENT_TERMINAL_TMUX_SOCKET` | `--tmux-socket` | `agent-terminal` | Dedicated tmux socket name. `default` is refused: your own tmux server is never used. |
-| `groups` | `AGENT_TERMINAL_GROUPS` (JSON) | none | none | Extra tmux sockets to show as their own sidebar group. |
-| `transcribeUrl` | `AGENT_TERMINAL_TRANSCRIBE_URL` | none | unset | OpenAI-compatible `/v1/audio/transcriptions` URL. The mic button is hidden when unset. |
-| `transcribeModel` | `AGENT_TERMINAL_TRANSCRIBE_MODEL` | none | `whisper-1` | Model name sent to that endpoint. |
-| `transcribeApiKey` | `AGENT_TERMINAL_TRANSCRIBE_API_KEY` | none | unset | Sent as `Authorization: Bearer ...` to the transcription endpoint. |
-| `cwdPresets` | `AGENT_TERMINAL_CWD_PRESETS` (comma list) | none | `["~"]` | Folder shortcuts in the New session dialog. |
+| `host` | `TMUX_TERMINALS_HOST` | `--host` | `127.0.0.1` | Bind address. `0.0.0.0` serves the LAN. |
+| `port` | `TMUX_TERMINALS_PORT` | `--port` | `8767` | Port. |
+| `token` | `TMUX_TERMINALS_TOKEN` | none (argv shows in `ps`) | generated | At least 16 characters. Generated on first run into `config.json` (mode 600). |
+| `tls` | `TMUX_TERMINALS_TLS` | `--tls` | `auto` | `auto`: self-signed certificate when host is not loopback. `off`. Or `{ "cert": "...", "key": "..." }` (flag form `cert.pem,key.pem`). |
+| `agents` | `TMUX_TERMINALS_AGENTS` (JSON) | none | see below | What the "New session" dialog offers. |
+| `tmuxSocket` | `TMUX_TERMINALS_TMUX_SOCKET` | `--tmux-socket` | `tmux-terminals` | Dedicated tmux socket name. `default` is refused: your own tmux server is never used. |
+| `groups` | `TMUX_TERMINALS_GROUPS` (JSON) | none | none | Extra tmux sockets to show as their own sidebar group. |
+| `transcribeUrl` | `TMUX_TERMINALS_TRANSCRIBE_URL` | none | unset | OpenAI-compatible `/v1/audio/transcriptions` URL. The mic button is hidden when unset. |
+| `transcribeModel` | `TMUX_TERMINALS_TRANSCRIBE_MODEL` | none | `whisper-1` | Model name sent to that endpoint. |
+| `transcribeApiKey` | `TMUX_TERMINALS_TRANSCRIBE_API_KEY` | none | unset | Sent as `Authorization: Bearer ...` to the transcription endpoint. |
+| `cwdPresets` | `TMUX_TERMINALS_CWD_PRESETS` (comma list) | none | `["~"]` | Folder shortcuts in the New session dialog. |
 
 ### Agents
 
@@ -111,7 +111,7 @@ If you configure nothing you get `shell` (your `$SHELL`) plus `claude`, `codex` 
 }
 ```
 
-Spawned processes inherit your environment minus `AGENT_TERMINAL_*`, `TMUX` and `TMUX_PANE`. The working directory must be an existing absolute directory (`~` is expanded).
+Spawned processes inherit your environment minus `TMUX_TERMINALS_*`, `TMUX` and `TMUX_PANE`. The working directory must be an existing absolute directory (`~` is expanded).
 
 ### Watched tmux sockets (groups)
 
@@ -121,7 +121,7 @@ Already running agents in another tmux server (for example one that a script or 
 { "groups": [ { "label": "Work", "socket": "work" } ] }
 ```
 
-Every session on that socket is listed (polled every few seconds). Set a nicer title with `tmux -L work set-option -t <session> @agent_terminal_title "Fix flaky test"`. The socket must not be `default` or your main `tmuxSocket`.
+Every session on that socket is listed (polled every few seconds). Set a nicer title with `tmux -L work set-option -t <session> @tmux_terminals_title "Fix flaky test"`. The socket must not be `default` or your main `tmuxSocket`.
 
 ### Dictation (optional)
 
@@ -134,18 +134,18 @@ If you embed the page in a WebView, you can provide an optional `window.nativeCl
 ## CLI
 
 ```
-agent-terminal [start] [--host --port --tls --tmux-socket --config-dir] [--daemon] [--show-token]
-agent-terminal stop | status [--json]
-agent-terminal doctor [--json]          exit code 1 when a check fails
-agent-terminal smoke [--json]           test a running server end to end (auth, WebSocket, shell echo)
-agent-terminal token [--url | --qr | --json]
-agent-terminal config show|path|set <key> <value>   (scalar settings; agents/groups: edit the file)
-agent-terminal install-service [--dry-run] [--force]
+tmux-terminals [start] [--host --port --tls --tmux-socket --config-dir] [--daemon] [--show-token]
+tmux-terminals stop | status [--json]
+tmux-terminals doctor [--json]          exit code 1 when a check fails
+tmux-terminals smoke [--json]           test a running server end to end (auth, WebSocket, shell echo)
+tmux-terminals token [--url | --qr | --json]
+tmux-terminals config show|path|set <key> <value>   (scalar settings; agents/groups: edit the file)
+tmux-terminals install-service [--dry-run] [--force]
 ```
 
 `GET /healthz` needs no token and returns only `{"ok":true,"version":"..."}`.
 
-The token is printed (URL and QR) once, on the very first start in an interactive terminal. It is never written to logs afterwards (non-interactive starts, such as services, never print it). Show it again with `agent-terminal token --url`.
+The token is printed (URL and QR) once, on the very first start in an interactive terminal. It is never written to logs afterwards (non-interactive starts, such as services, never print it). Show it again with `tmux-terminals token --url`.
 
 ## Container (sandbox option)
 
@@ -153,14 +153,14 @@ Native is the main path. If you want the agents confined to a container and one 
 
 ```bash
 docker compose up -d --build            # or: podman compose up -d --build
-docker compose exec agent-terminal agent-terminal token --url
+docker compose exec tmux-terminals tmux-terminals token --url
 ```
 
 `compose.yaml` publishes `127.0.0.1:8767` and mounts `./workspace` at `/workspace`. The image contains node, tmux and git and only a shell agent; add agent CLIs with the `NPM_AGENTS` build arg (for example `"@anthropic-ai/claude-code @openai/codex"`). Sessions survive restarting the server process but not removing the container (use `docker compose restart`, not `down`, to keep running agents). Authenticate the agents inside the container (their own login flow); your host credentials are not shared.
 
 ## FAQ
 
-**Why tmux?** It is the boring, proven way to keep processes alive without a daemon of our own. The server is only a tmux *client*: it attaches a pty to each session and relays bytes to xterm.js in the browser. Kill the server, reboot Wi-Fi, close the tab: the agent is untouched. A dedicated socket (`tmux -L agent-terminal`) with its own config keeps it invisible to your normal tmux.
+**Why tmux?** It is the boring, proven way to keep processes alive without a daemon of our own. The server is only a tmux *client*: it attaches a pty to each session and relays bytes to xterm.js in the browser. Kill the server, reboot Wi-Fi, close the tab: the agent is untouched. A dedicated socket (`tmux -L tmux-terminals`) with its own config keeps it invisible to your normal tmux.
 
 **How do sessions persist?** Each session is a tmux session named `at-<uuid>`. On start the server lists those sessions and re-attaches (it logs `adopted N running session(s)`), restoring titles and the sidebar order from `sessions.json` / `order.json`. Only the red close button (or `pty_kill`) ends an agent. Rebooting the machine ends all tmux sessions, as usual.
 

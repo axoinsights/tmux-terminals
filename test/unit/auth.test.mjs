@@ -13,7 +13,7 @@ test("safeEqual compares correctly regardless of length", () => {
 
 test("token is read from Bearer header, cookie or query", () => {
   assert.deepEqual(extractToken(req({ headers: { authorization: "Bearer tok1" } })), { token: "tok1", via: "bearer" });
-  assert.deepEqual(extractToken(req({ headers: { cookie: "a=1; at_auth=tok2; b=3" } })), { token: "tok2", via: "cookie" });
+  assert.deepEqual(extractToken(req({ headers: { cookie: "a=1; tmux_terminals_auth=tok2; b=3" } })), { token: "tok2", via: "cookie" });
   assert.deepEqual(extractToken(req({ url: "/?x=1&token=tok3" })), { token: "tok3", via: "query" });
   assert.deepEqual(extractToken(req()), { token: null, via: null });
   assert.deepEqual(parseCookies("a=%20b; c=d"), { a: " b", c: "d" });
@@ -51,6 +51,6 @@ test("requests without credentials do not count as guesses", () => {
 
 test("a stale cookie does not hide a fresh ?token= (after rotating the token)", () => {
   const a = new Authenticator("new-token");
-  const r = a.check({ headers: { cookie: "at_auth=old-token" }, url: "/?token=new-token" }, "1.2.3.4");
+  const r = a.check({ headers: { cookie: "tmux_terminals_auth=old-token" }, url: "/?token=new-token" }, "1.2.3.4");
   assert.deepEqual(r, { ok: true, via: "query" });
 });

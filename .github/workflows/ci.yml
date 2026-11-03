@@ -24,7 +24,7 @@ jobs:
           npm install --no-save playwright@1
           npx playwright install --with-deps chromium
       - name: Doctor
-        run: node bin/agent-terminal.mjs doctor
+        run: node bin/tmux-terminals.mjs doctor
       - name: Tests (unit + browser end-to-end)
         run: npm test
         env:
