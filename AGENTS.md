@@ -56,10 +56,10 @@ Expected: `{"ok":true,"version":"0.1.0"}`. (Use the port you chose.)
 Optional end-to-end check (authenticated WebSocket, starts a shell, echoes a marker, kills the session):
 
 ```bash
-node scripts/smoke.mjs http://127.0.0.1:8767
+node bin/agent-terminal.mjs smoke        # add --json for machine-readable steps
 ```
 
-Expected last line: `smoke ok: ...`.
+Pass condition: exit code 0 and last line `smoke ok`. (It reads the same config, so pass the same `--port` you started with.)
 
 ## 4. Give the user access
 

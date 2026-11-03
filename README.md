@@ -137,6 +137,7 @@ If you embed the page in a WebView, you can provide an optional `window.nativeCl
 agent-terminal [start] [--host --port --tls --tmux-socket --config-dir] [--daemon] [--show-token]
 agent-terminal stop | status [--json]
 agent-terminal doctor [--json]          exit code 1 when a check fails
+agent-terminal smoke [--json]           test a running server end to end (auth, WebSocket, shell echo)
 agent-terminal token [--url | --qr | --json]
 agent-terminal install-service [--dry-run] [--force]
 ```
