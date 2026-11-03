@@ -23,6 +23,8 @@ Usage:
   agent-terminal doctor [--json]      Check node, tmux, node-pty, config, port, TLS; exit 1 on problems
   agent-terminal token [--url|--qr]   Print the access token (or pairing URL / QR code)
   agent-terminal smoke [--json]       Test a running server end to end (auth, WebSocket, shell echo)
+  agent-terminal config show|path|set <key> <value>
+                                      Show (token redacted), locate, or change scalar settings in config.json
   agent-terminal install-service      Write a systemd user unit (Linux) or launchd agent (macOS); prints how to enable it
   agent-terminal --help | --version
 
@@ -124,7 +126,7 @@ async function cmdStart(flags: Flags, v: Record<string, unknown>): Promise<void>
     tls = config.tls;
   }
   if (!tls && !isLoopback(config.host)) {
-    console.warn("WARNING: serving plain HTTP on a non-loopback address; the access token and your shell travel unencrypted. Use --tls auto or a TLS proxy.");
+    console.warn("note: TLS is off on a non-loopback address. Make sure a TLS proxy or a private network protects the token (see SECURITY.md).");
   }
 
   let running;
@@ -211,6 +213,35 @@ async function main(): Promise<void> {
         console.log("Not enabled yet. To enable and start it, run:");
         for (const c of res.commands) console.log(`  ${c}`);
         console.log("Then check: agent-terminal status   and   agent-terminal token --url");
+        return;
+      }
+      case "config": {
+        const sub = positionals[1] ?? "show";
+        const loaded = loadConfig({ flags });
+        if (sub === "path") { console.log(loaded.configFile); return; }
+        if (sub === "show") {
+          const { token: _t, transcribeApiKey: _k, ...rest } = loaded.config;
+          void _t; void _k;
+          console.log(JSON.stringify({ configFile: loaded.configFile, ...rest, token: "(hidden; agent-terminal token)" }, null, 2));
+          return;
+        }
+        if (sub === "set") {
+          const [key, value] = [positionals[2], positionals[3]];
+          const scalar = ["host", "port", "tls", "tmuxSocket", "transcribeUrl", "transcribeModel", "transcribeApiKey"];
+          if (!key || value === undefined || !scalar.includes(key)) fail(`usage: agent-terminal config set <${scalar.join("|")}> <value>   (for agents, groups, cwdPresets edit ${loaded.configFile})`, 2);
+          if (key === "port" && !/^\d+$/.test(value)) fail(`port must be a number (got "${value}"); change not applied`);
+          const before = fs.readFileSync(loaded.configFile, "utf8");
+          const obj = JSON.parse(before) as Record<string, unknown>;
+          obj[key] = key === "port" ? Number(value) : key === "tls" && value.includes(",") ? { cert: value.split(",")[0], key: value.split(",")[1] } : value;
+          fs.writeFileSync(loaded.configFile, JSON.stringify(obj, null, 2) + "\n", { mode: 0o600 });
+          try { loadConfig({ flags, env: { ...process.env, AGENT_TERMINAL_CONFIG_DIR: loaded.configDir } }); } catch (e) {
+            fs.writeFileSync(loaded.configFile, before, { mode: 0o600 });
+            fail(`${(e as Error).message} (change not applied)`);
+          }
+          console.log(`set ${key} in ${loaded.configFile}. Restart for it to take effect.`);
+          return;
+        }
+        fail("usage: agent-terminal config show|path|set <key> <value>", 2);
         return;
       }
       case "smoke": {
