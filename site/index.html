@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tmux-terminals: your terminal sessions on your phone</title>
+<meta name="description" content="A self-hosted web terminal for coding agents. Open your tmux sessions from your phone or any browser. Nothing dies when Wi-Fi drops or the tab closes.">
+<meta name="theme-color" content="#070D1A">
+<link rel="canonical" href="https://tmux-terminals.axoinsights.com/">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<meta property="og:type" content="website">
+<meta property="og:title" content="tmux-terminals: your terminal sessions on your phone">
+<meta property="og:description" content="Steer Claude Code, Codex, aider or pi from your phone. Sessions live in tmux, so nothing dies when the connection drops.">
+<meta property="og:url" content="https://tmux-terminals.axoinsights.com/">
+<meta property="og:image" content="https://tmux-terminals.axoinsights.com/assets/screenshot-desktop.png">
+<meta property="og:image:alt" content="tmux-terminals on a desktop browser: session list on the left, a terminal on the right">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Syne:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="top">
+  <div class="wrap bar">
+    <a class="brand" href="https://www.axoinsights.com" aria-label="Axo Insights">
+      <img src="assets/logo.png" alt="" width="28" height="28">
+      <span>Axo Insights</span>
+    </a>
+    <nav aria-label="Main">
+      <a href="#features">Features</a>
+      <a href="#how">How it works</a>
+      <a href="#security">Security</a>
+      <a class="gh" href="https://github.com/axoinsights/tmux-terminals">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+  <section class="hero wrap">
+    <div class="hero-copy">
+      <p class="kicker">Open source &middot; MIT</p>
+      <h1>Your terminal sessions, <em>on your phone.</em></h1>
+      <p class="lead">tmux-terminals is a web terminal you host yourself. Start a coding agent on your laptop or server, walk away, and keep steering it from your phone or any browser.</p>
+      <p>Sessions live in tmux. If the Wi-Fi drops or you close the tab, the agent keeps running. Open the page again and pick up where you left off.</p>
+      <p class="for">Made for people who run coding agents like Claude Code, Codex, aider or pi on their own machine.</p>
+
+      <div class="cta">
+        <div class="cmd" role="group" aria-label="Install command">
+          <code><span class="prompt" aria-hidden="true">$</span> npx tmux-terminals</code>
+          <button type="button" data-copy="npx tmux-terminals">Copy</button>
+        </div>
+        <a class="btn" href="https://github.com/axoinsights/tmux-terminals">View on GitHub</a>
+      </div>
+      <p class="req">Needs Node 20+ and tmux. Linux and macOS (Windows via WSL2).</p>
+      <p class="sr" id="copy-status" role="status" aria-live="polite"></p>
+    </div>
+
+    <figure class="hero-shot">
+      <img src="assets/screenshot-phone.png" width="520" height="1085" alt="tmux-terminals on a phone: a terminal with the compose box and key toolbar">
+    </figure>
+  </section>
+
+  <section class="wrap desk" aria-labelledby="desk-h">
+    <h2 id="desk-h" class="sr">On the desktop</h2>
+    <figure>
+      <img src="assets/screenshot-desktop.png" width="1600" height="956" alt="tmux-terminals in a desktop browser: the session list on the left and a terminal on the right" loading="lazy">
+      <figcaption>The same sessions on a laptop: a sidebar of sessions and the terminal next to it.</figcaption>
+    </figure>
+  </section>
+
+  <section id="features" class="wrap" aria-labelledby="feat-h">
+    <h2 id="feat-h">Built for thumbs</h2>
+    <p class="section-sub">A real terminal is hard to use on a small screen. These parts make it easier.</p>
+    <ul class="grid">
+      <li><h3>Compose box</h3><p>Type in a normal text box, so autocorrect and voice typing work. Enter sends. Shift+Enter adds a new line.</p></li>
+      <li><h3>Key buttons</h3><p>Esc, Tab, arrows, Ctrl-C, Ctrl-D, Ctrl-U, Ctrl-R and Enter are one tap away.</p></li>
+      <li><h3>Copy and paste</h3><p>Paste, Copy and Screen buttons handle the clipboard. Screen copies what you see. Select lets you drag-select.</p></li>
+      <li><h3>QR code to open on your phone</h3><p>Run <code>tmux-terminals token --qr</code> and scan it with your camera. The page sets a cookie and cleans the address bar.</p></li>
+      <li><h3>Token login</h3><p>A random token is required on every route, even from localhost.</p></li>
+      <li><h3>Sessions that stay alive</h3><p>Each session is a tmux session. Restart the server and the agents are re-attached.</p></li>
+      <li><h3>Drag to reorder</h3><p>Rename, kill and drag sessions in the sidebar. The order is shared by all your devices.</p></li>
+      <li><h3>Doctor and smoke checks</h3><p><code>tmux-terminals doctor</code> finds setup problems and prints the fix. <code>smoke</code> tests a running server end to end.</p></li>
+      <li><h3>Run it as a service</h3><p><code>tmux-terminals install-service</code> writes a systemd user unit on Linux or a launchd agent on macOS. It prints the commands to enable it and never enables anything silently.</p></li>
+    </ul>
+  </section>
+
+  <section id="how" class="wrap" aria-labelledby="how-h">
+    <h2 id="how-h">How it works</h2>
+    <ol class="steps">
+      <li><span class="n" aria-hidden="true">1</span><div><h3>Run it</h3><p>Run <code>npx tmux-terminals</code> on your machine. The first run creates a config with a random token and prints a URL and a QR code.</p></div></li>
+      <li><span class="n" aria-hidden="true">2</span><div><h3>Start an agent</h3><p>Open the URL, press <strong>New session</strong>, then pick an agent and a folder.</p></div></li>
+      <li><span class="n" aria-hidden="true">3</span><div><h3>Open it on your phone</h3><p>Scan the QR code, or add the page to your home screen. Close the tab whenever you like. The session keeps running in tmux.</p></div></li>
+    </ol>
+  </section>
+
+  <section id="security" class="wrap" aria-labelledby="sec-h">
+    <h2 id="sec-h">Security note</h2>
+    <div class="note">
+      <p>Anyone who has your token gets a shell as your user. Treat it like a password.</p>
+      <p>By default the server only listens on <code>127.0.0.1</code>. It also checks the WebSocket origin and uses its own tmux socket, so your normal tmux server is never touched.</p>
+      <p>To reach it from your phone, a private network is the best choice. The README recommends Tailscale (<code>tailscale serve</code>) for real HTTPS with nothing exposed to the internet. On your home Wi-Fi you can use <code>--host 0.0.0.0</code>, which turns on a self-signed certificate.</p>
+      <p><a href="https://github.com/axoinsights/tmux-terminals#exposing-it-safely">Read the full guide</a></p>
+    </div>
+  </section>
+
+  <section class="wrap final" aria-labelledby="go-h">
+    <h2 id="go-h">Try it in 30 seconds</h2>
+    <div class="cta">
+      <div class="cmd" role="group" aria-label="Install command">
+        <code><span class="prompt" aria-hidden="true">$</span> npx tmux-terminals</code>
+        <button type="button" data-copy="npx tmux-terminals">Copy</button>
+      </div>
+      <a class="btn" href="https://github.com/axoinsights/tmux-terminals">View on GitHub</a>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap foot">
+    <p>Made by <a href="https://www.axoinsights.com">Axo Insights</a>, a technology company modernizing democracy.</p>
+    <ul>
+      <li><a href="https://github.com/axoinsights/tmux-terminals/blob/main/LICENSE">MIT license</a></li>
+      <li><a href="https://github.com/axoinsights/tmux-terminals">GitHub</a></li>
+      <li><a href="https://www.npmjs.com/package/tmux-terminals">npm</a></li>
+    </ul>
+  </div>
+</footer>
+<script src="script.js" defer></script>
+</body>
+</html>
