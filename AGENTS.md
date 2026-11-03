@@ -45,10 +45,11 @@ node bin/agent-terminal.mjs start --daemon
 
 Pass condition: it prints `agent-terminal running in the background (pid N), http://127.0.0.1:8767` and exits 0. A log is kept in `~/.config/agent-terminal/agent-terminal.log`.
 
-Health check (no token needed):
+Health check (no token needed; `curl` may be absent, node is always there):
 
 ```bash
-curl -fsS http://127.0.0.1:8767/healthz
+node -e "fetch('http://127.0.0.1:8767/healthz').then(r=>r.text()).then(t=>console.log(t),()=>process.exit(1))"
+# or: curl -fsS http://127.0.0.1:8767/healthz
 ```
 
 Expected: `{"ok":true,"version":"0.1.0"}`. (Use the port you chose.)
@@ -73,7 +74,7 @@ node bin/agent-terminal.mjs token           # the token alone
 By default the server listens on `127.0.0.1` only. To reach it from the user's phone, pick one and tell the user what you did:
 
 - Tailscale: `tailscale serve --bg --https=443 http://127.0.0.1:8767`
-- LAN: `node bin/agent-terminal.mjs stop && node bin/agent-terminal.mjs config set host 0.0.0.0 && node bin/agent-terminal.mjs start --daemon` (the setting is saved in config.json; a self-signed TLS certificate is generated and the browser warns once). Then use the `https://<lan-ip>:8767/?token=...` URL from `token --url`, and re-check with `curl -fsSk https://127.0.0.1:8767/healthz` and `node bin/agent-terminal.mjs smoke`.
+- LAN: `node bin/agent-terminal.mjs stop && node bin/agent-terminal.mjs config set host 0.0.0.0 && node bin/agent-terminal.mjs start --daemon` (the setting is saved in config.json; a self-signed TLS certificate is generated and the browser warns once). Then use the `https://<lan-ip>:8767/?token=...` URL from `token --url`, and re-check with `NODE_TLS_REJECT_UNAUTHORIZED=0 node -e "fetch('https://127.0.0.1:8767/healthz').then(r=>r.text()).then(console.log)"` (or `curl -fsSk https://127.0.0.1:8767/healthz`) and `node bin/agent-terminal.mjs smoke`.
 
 To see or change settings without editing JSON by hand: `node bin/agent-terminal.mjs config show` (token redacted), `config path`, `config set <host|port|tls|tmuxSocket|transcribeUrl|transcribeModel|transcribeApiKey> <value>`. Agents / groups / cwdPresets are edited in the file shown by `config path`.
 
@@ -94,7 +95,7 @@ loginctl enable-linger "$USER"      # optional: keep running without a login ses
 
 On macOS: `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/dev.agent-terminal.plist`.
 
-Check: `node bin/agent-terminal.mjs status` (exit 0 = running) and `curl -fsS http://127.0.0.1:8767/healthz`. Logs: `journalctl --user -u agent-terminal` (Linux).
+Check: `node bin/agent-terminal.mjs status` (exit 0 = running; add `--json` for scripts) and the health check from step 3. Logs: `journalctl --user -u agent-terminal` (Linux).
 
 Flags such as `--host`, `--port` given to `install-service` are written into the unit. Use `--dry-run` to preview and `--force` to overwrite an existing unit.
 
