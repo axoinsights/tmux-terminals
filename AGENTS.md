@@ -2,7 +2,7 @@
 
 Every step below is non-interactive (no prompts, no TTY needed) and has a pass/fail check. Run the commands from the repository root unless stated. Exit code 0 means success.
 
-`https://github.com/axoinsights/tmux-terminals.git` is the git URL you were given for this project (or skip step 1 if you already have the directory).
+Repository: https://github.com/axoinsights/tmux-terminals (skip step 1 if you already have the directory, or use the npm route below it).
 
 ## 0. Prerequisites
 
