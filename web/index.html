@@ -273,7 +273,7 @@
   <div id="sidebar-backdrop"></div>
   <div id="sidebar" class="mobile-hidden">
     <div id="sidebar-header">
-      <h1>Terminal Hub</h1>
+      <h1>Agent Terminal</h1>
       <div id="conn-dot" title="disconnected"></div>
     </div>
     <div id="session-list" role="list"></div>
@@ -916,7 +916,7 @@
   }
   function updateTitleBadge() {
     const n = [...sessions.values()].filter((s) => s.waiting).length;
-    document.title = (n ? `(${n}) ` : "") + "Terminal Hub";
+    document.title = (n ? `(${n}) ` : "") + "Agent Terminal";
   }
   function clearWaiting(entry) {
     if (!entry.waiting) return;
