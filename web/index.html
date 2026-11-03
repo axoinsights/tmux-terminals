@@ -306,7 +306,7 @@
     </div>
     <div id="term-container">
       <div id="empty-state">
-        <div>No sessions yet</div>
+        <div id="empty-text">No sessions yet</div>
         <button id="empty-new-btn">+ New session</button>
       </div>
       <div id="split-container">
@@ -522,6 +522,9 @@
     return `${proto}//${location.host}/ws`;
   }
 
+  // Sessions whose scrollback is being replayed into xterm right now (see pty_scrollback).
+  const replayingIds = new Set();
+
   function connect() {
     ws = new WebSocket(wsUrl());
     ws.onopen = () => {
@@ -556,6 +559,7 @@
         // Server's source of truth for what's running (covers other devices /
         // sessions spawned before this tab connected). Add any we don't know yet.
         const serverIds = new Set(msg.sessions.map((s) => s.id));
+        el("empty-text").textContent = msg.sessions.length ? "Pick a session from the list, or start a new one" : "No sessions yet";
         for (const id of closedByMe) { if (!serverIds.has(id)) closedByMe.delete(id); } // server finally reaped it
         for (const info of msg.sessions) {
           if (closedByMe.has(info.id)) continue;
@@ -601,7 +605,9 @@
         const s = sessions.get(msg.sessionId);
         if (s) {
           s.term.reset();
-          if (msg.data) s.term.write(msg.data);
+          // The replayed bytes can contain terminal queries an app sent long ago (device attributes, cursor position);
+          // xterm answers them through onData, which would type replies like "0;276;0c" into the live shell.
+          if (msg.data) { replayingIds.add(msg.sessionId); s.term.write(msg.data, () => replayingIds.delete(msg.sessionId)); }
           // The server only applies the size of the client in use and drops a
           // client's size when it disconnects, so re-announce ours after every
           // (re)attach: onResize alone never fires if the fit didn't change.
@@ -797,6 +803,7 @@
       term.textarea.addEventListener("paste", () => { lastPasteEventAt = Date.now(); }, true);
     }
     term.onData((data) => {
+      if (replayingIds.has(info.id)) return; // xterm answering queries inside replayed scrollback, not the user
       const now = Date.now();
       if (data.length > 1 && now - lastPasteEventAt < PASTE_DEDUP_WINDOW_MS) {
         if (data === lastPasteData && now - lastPasteDataAt < PASTE_DEDUP_WINDOW_MS) return;

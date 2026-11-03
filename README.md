@@ -4,7 +4,13 @@ A self-hosted, phone-friendly web terminal for driving coding agents (Claude Cod
 
 Start an agent on your laptop or server, walk away, and keep steering it from your phone. Sessions live in tmux, so they survive closed tabs, flaky Wi-Fi and server restarts.
 
-> Screenshot: add `docs/screenshot.png` (sidebar with sessions on the left, Claude Code in xterm.js on the right, mobile key toolbar at the bottom).
+<p align="center">
+  <img src="docs/screenshot-desktop.png" alt="Tmux Terminals on a desktop browser: session list on the left, a terminal on the right" width="72%">
+  &nbsp;
+  <img src="docs/screenshot-phone.png" alt="Tmux Terminals on a phone: terminal with the compose box and key toolbar" width="22%">
+</p>
+
+Made by [Axo Insights](https://www.axoinsights.com), which builds AI tools for civil rights and advocacy organizations.
 
 - **Persistent**: every session is a tmux session on a dedicated socket. Restart the server, the agents keep running and are re-attached.
 - **Built for thumbs**: key toolbar (Esc, Tab, arrows, Ctrl-C...), a compose bar for autocorrect/voice typing, Paste / Copy / Screen buttons, select mode, swipe gestures, install as an app (PWA).
