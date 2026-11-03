@@ -7,8 +7,8 @@ Every step below is non-interactive (no prompts, no TTY needed) and has a pass/f
 ## 0. Prerequisites
 
 - Node.js 20 or newer: `node --version`
-- tmux: `tmux -V`. If missing: `apt-get install -y tmux` (Debian/Ubuntu, add `sudo` if not root), `dnf install -y tmux`, `brew install tmux`.
-- git (only to clone), openssl (only for `--host 0.0.0.0` with automatic TLS).
+- tmux: `tmux -V`. If missing: `apt-get update && apt-get install -y tmux` (Debian/Ubuntu; add `sudo` if not root), `dnf install -y tmux`, `brew install tmux`.
+- git (only to clone; `apt-get install -y git`), openssl (only for `--host 0.0.0.0` with automatic TLS).
 - Linux or macOS. On Windows, work inside WSL2.
 
 ## 1. Install
@@ -21,7 +21,7 @@ npm install
 
 `npm install` compiles TypeScript into `dist/` (the `prepare` script) and downloads prebuilt native modules, so no compiler is normally needed. Check: `test -f dist/cli.js && echo built`.
 
-Alternative from a tarball: `npm pack` then `npm install -g ./agent-terminal-*.tgz` puts an `agent-terminal` command on PATH (below, replace `node bin/agent-terminal.mjs` with `agent-terminal`).
+Alternative from a tarball: `npm pack` then `npm install -g ./agent-terminal-0.1.0.tgz` (or run it once with `npx --yes ./agent-terminal-0.1.0.tgz doctor --json`; use a path starting with `./`) puts an `agent-terminal` command on PATH (below, replace `node bin/agent-terminal.mjs` with `agent-terminal`).
 
 ## 2. Verify the environment
 
@@ -73,7 +73,9 @@ node bin/agent-terminal.mjs token           # the token alone
 By default the server listens on `127.0.0.1` only. To reach it from the user's phone, pick one and tell the user what you did:
 
 - Tailscale: `tailscale serve --bg --https=443 http://127.0.0.1:8767`
-- LAN: restart with `node bin/agent-terminal.mjs stop && node bin/agent-terminal.mjs start --daemon --host 0.0.0.0` (a self-signed TLS certificate is generated; the browser warns once). Then use the `https://<lan-ip>:8767/?token=...` URL from `token --url`.
+- LAN: `node bin/agent-terminal.mjs stop && node bin/agent-terminal.mjs config set host 0.0.0.0 && node bin/agent-terminal.mjs start --daemon` (the setting is saved in config.json; a self-signed TLS certificate is generated and the browser warns once). Then use the `https://<lan-ip>:8767/?token=...` URL from `token --url`, and re-check with `curl -fsSk https://127.0.0.1:8767/healthz` and `node bin/agent-terminal.mjs smoke`.
+
+To see or change settings without editing JSON by hand: `node bin/agent-terminal.mjs config show` (token redacted), `config path`, `config set <host|port|tls|tmuxSocket|transcribeUrl|transcribeModel|transcribeApiKey> <value>`. Agents / groups / cwdPresets are edited in the file shown by `config path`.
 
 ## 5. Start at login / boot (optional)
 
