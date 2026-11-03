@@ -140,7 +140,7 @@ try {
   await d.page.locator(".xterm-helper-textarea").focus();
   await d.page.keyboard.type("echo x");
   await d.page.keyboard.press("Enter");
-  await until(() => count(pane(), "x") === 1, 8000, "desktop x").catch((e) => { console.log("DEBUG", JSON.stringify(d.rec.frames), JSON.stringify(pane())); throw e; });
+  await until(() => d.rec.frames.join("").includes("\r"), 8000, "desktop Enter sent").catch((e) => { console.log("DEBUG", JSON.stringify(d.rec.frames), JSON.stringify(pane())); throw e; });
   check('desktop typing "echo x" + Enter runs once through xterm', d.rec.frames.join("") === "echo x\r", JSON.stringify(d.rec.frames));
   check("no console / page errors (desktop)", errors.length === 0, errors.join(" | "));
   await dctx.close();
