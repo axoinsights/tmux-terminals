@@ -71,7 +71,7 @@ try {
   await until(async () => (await screenText(p2)).includes("ECHO_AGENT_READY"), 10000, "agent banner");
   check("spawned the chosen agent and its output reaches xterm", true);
   const row = await p2.locator(".session-item .sub").first().innerText();
-  check("sidebar shows the working directory", row.includes(sb.tmp.replace(/^\/home\/[^/]+/, "~")), row);
+  check("sidebar shows the working directory", row.includes(sb.tmp), row);
 
   await p2.keyboard.type("hello-agent");
   await p2.keyboard.press("Enter");

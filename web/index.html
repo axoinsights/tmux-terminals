@@ -376,6 +376,7 @@
   let AGENTS = [];
   let GROUPS = [];
   let selectedAgent = "";
+  let HOME = "";
 
 
   // Labels added with sidebar groups + reordering, in English and Spanish
@@ -1291,7 +1292,7 @@
   }
 
   function shortenCwd(cwd) {
-    return cwd.replace(/^\/home\/[^/]+/, "~");
+    return HOME && (cwd === HOME || cwd.startsWith(HOME + "/")) ? "~" + cwd.slice(HOME.length) : cwd;
   }
   function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -1825,7 +1826,7 @@
   fetch("/api/config", { credentials: "same-origin" })
     .then((r) => (r.ok ? r.json() : Promise.reject(new Error("HTTP " + r.status))))
     .then((c) => {
-      AGENTS = c.agents || []; GROUPS = c.groups || []; CWD_PRESETS = c.cwdPresets && c.cwdPresets.length ? c.cwdPresets : ["~"];
+      HOME = c.home || ""; AGENTS = c.agents || []; GROUPS = c.groups || []; CWD_PRESETS = c.cwdPresets && c.cwdPresets.length ? c.cwdPresets : ["~"];
       selectedAgent = AGENTS.length ? AGENTS[0].id : "";
       el("mic-btn").hidden = !c.transcribe;
       renderAgentToggle();

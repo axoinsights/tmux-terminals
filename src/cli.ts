@@ -9,6 +9,7 @@ import { formatReport, runDoctor } from "./doctor.js";
 import { baseUrls, effectiveScheme, pairingUrls, qrText } from "./pairing.js";
 import { installService } from "./service.js";
 import { startServer } from "./server.js";
+import { runSmoke } from "./smoke.js";
 import { ensureSelfSigned } from "./tls.js";
 import { readVersion } from "./version.js";
 
@@ -21,6 +22,7 @@ Usage:
   agent-terminal status               Show whether it is running
   agent-terminal doctor [--json]      Check node, tmux, node-pty, config, port, TLS; exit 1 on problems
   agent-terminal token [--url|--qr]   Print the access token (or pairing URL / QR code)
+  agent-terminal smoke [--json]       Test a running server end to end (auth, WebSocket, shell echo)
   agent-terminal install-service      Write a systemd user unit (Linux) or launchd agent (macOS); prints how to enable it
   agent-terminal --help | --version
 
@@ -209,6 +211,16 @@ async function main(): Promise<void> {
         console.log("Not enabled yet. To enable and start it, run:");
         for (const c of res.commands) console.log(`  ${c}`);
         console.log("Then check: agent-terminal status   and   agent-terminal token --url");
+        return;
+      }
+      case "smoke": {
+        const res = await runSmoke(flags, positionals[1] || "shell");
+        if (v.json) console.log(JSON.stringify(res, null, 2));
+        else {
+          for (const st of res.steps) console.log(`[${st.ok ? "ok  " : "FAIL"}] ${st.step}${st.detail ? ` (${st.detail})` : ""}`);
+          console.log(res.ok ? "smoke ok" : "smoke FAILED");
+        }
+        process.exit(res.ok ? 0 : 1);
         return;
       }
       case "stop": {

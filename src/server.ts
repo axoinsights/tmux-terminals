@@ -2,6 +2,7 @@
 import * as http from "node:http";
 import * as https from "node:https";
 import * as fs from "node:fs";
+import * as os from "node:os";
 import * as path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
@@ -277,6 +278,7 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
       if (p === "/api/config") {
         json(res, 200, {
           version,
+          home: os.homedir(),
           agents: config.agents.map((a) => ({ id: a.id, label: a.label, canResume: a.resumeArgs.length > 0, available: pty.resolveAgentCommand(a) !== null })),
           groups: config.groups.map((g) => g.label),
           cwdPresets: config.cwdPresets,
