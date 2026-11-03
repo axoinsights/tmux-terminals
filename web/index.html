@@ -1,0 +1,1838 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content" />
+<title>Agent Terminal</title>
+<link rel="stylesheet" href="/vendor/xterm.css" />
+<link rel="manifest" href="/manifest.webmanifest" />
+<meta name="theme-color" content="#12121a" />
+<!-- iOS home-screen support (Apple ignores the web manifest for most of this) -->
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Agent Terminal" />
+<link rel="apple-touch-icon" href="/icons/icon-192.png" />
+<style>
+  :root {
+    --bg: #12121a;
+    --panel: #1a1a26;
+    --panel2: #21212f;
+    --border: #2c2c3a;
+    --text: #d8d8e2;
+    --muted: #7a7a8c;
+    --accent: #6c8cff;
+    --danger: #ff5c5c;
+    --ok: #4cd964;
+  }
+  /* Light theme for the chrome (sidebar, bars, dialogs); the terminal itself stays black. */
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --bg: #f3f4f8; --panel: #ffffff; --panel2: #eceef4; --border: #d6d9e3; --text: #1d2030; --muted: #5d6275;
+      --accent: #3d63dd; --danger: #d32f2f; --ok: #1f8f3a;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f3f4f8; --panel: #ffffff; --panel2: #eceef4; --border: #d6d9e3; --text: #1d2030; --muted: #5d6275;
+    --accent: #3d63dd; --danger: #d32f2f; --ok: #1f8f3a;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+  html, body {
+    height: 100%; margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, system-ui, sans-serif; overflow: hidden;
+    overscroll-behavior: none; /* kill pull-to-refresh / rubber-banding on mobile */
+  }
+  /* --app-height is set from JS via the visualViewport API so the layout
+     shrinks when the on-screen keyboard opens (100dvh does NOT account for
+     the keyboard on most mobile browsers — only for browser chrome). The
+     `interactive-widget=resizes-content` viewport meta tag handles this
+     natively on browsers that support it; this JS fallback covers the rest
+     (notably iOS Safari). */
+  #app { display: flex; height: 100dvh; height: var(--app-height, 100dvh); width: 100vw; }
+
+  /* Sidebar */
+  #sidebar {
+    width: 260px; min-width: 260px; background: var(--panel); border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; transition: margin-left 0.2s ease;
+  }
+  #sidebar.collapsed { margin-left: -260px; }
+  #sidebar-header {
+    padding: calc(10px + env(safe-area-inset-top)) 12px 10px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  #sidebar-backdrop {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 39;
+  }
+  #sidebar-backdrop.show { display: block; }
+  #sidebar-header h1 { font-size: 13px; font-weight: 600; margin: 0; color: var(--muted); letter-spacing: 0.03em; text-transform: uppercase; }
+  #conn-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--danger); flex-shrink: 0; }
+  #conn-dot.up { background: var(--ok); }
+
+  #session-list { flex: 1; overflow-y: auto; padding: 6px; }
+  .session-item {
+    display: flex; align-items: center; gap: 8px; padding: 9px 8px; border-radius: 8px; cursor: pointer;
+    margin-bottom: 3px; border: 1px solid transparent;
+  }
+  .session-item:hover { background: var(--panel2); }
+  .session-item.active { background: var(--panel2); border-color: var(--border); }
+  .session-item.focused-split { border-color: var(--accent); }
+  .session-kind-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .session-item .meta { flex: 1; min-width: 0; }
+  .session-item .title-row { display: flex; align-items: center; gap: 5px; }
+  .session-item .title { font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .session-item .title-input {
+    font-size: 12.5px; background: var(--bg); color: var(--text); border: 1px solid var(--accent);
+    border-radius: 4px; padding: 1px 4px; width: 100%; font-family: inherit;
+  }
+  .session-item .rename-btn { color: var(--muted); font-size: 12px; padding: 6px; border-radius: 5px; opacity: 0.7; flex-shrink: 0; }
+  .session-item .rename-btn:hover { opacity: 1; background: var(--panel2); }
+  .session-item .sub { font-size: 10.5px; color: var(--muted); }
+  .session-item .close-btn { color: var(--muted); font-size: 16px; padding: 8px 10px; border-radius: 6px; margin: -8px -6px -8px 0; }
+  .session-item .close-btn:hover { color: var(--danger); background: rgba(255,92,92,0.1); }
+  .session-item.exited { opacity: 0.5; }
+  .session-item .restart-btn { color: var(--ok); font-size: 16px; padding: 8px 10px; border-radius: 6px; margin: -8px 0 -8px 0; }
+  .session-item .restart-btn:hover { background: rgba(76,217,100,0.12); }
+  .session-item .activity-dot {
+    width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex-shrink: 0;
+    animation: activity-pulse 1.4s ease-in-out infinite;
+  }
+  .session-item .waiting-badge {
+    background: #f0c14b; color: #1a1a26; font-size: 9.5px; font-weight: 700; border-radius: 999px;
+    padding: 1px 6px; flex-shrink: 0; letter-spacing: 0.02em;
+  }
+  @keyframes activity-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+  /* Groups + drag-and-drop reordering (order is stored server-side, shared by every device) */
+  .group-h { font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); padding: 10px 8px 4px; display: flex; align-items: center; gap: 6px; }
+  .group-h:first-child { padding-top: 4px; }
+  .group-h .n { font-weight: 600; opacity: 0.8; }
+  .group { min-height: 4px; }
+  .session-item { position: relative; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: pan-y; }
+  .session-item:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .session-item.dragging { background: var(--panel2); border-color: var(--accent); box-shadow: 0 8px 24px rgba(0,0,0,0.35); z-index: 2; cursor: grabbing; transform: scale(1.02); }
+  .session-item.press { background: var(--panel2); transition: background 0.4s; }
+  #session-list.reordering .session-item:not(.dragging) { transition: transform 0.12s; }
+  .move-btns { display: none; flex-direction: column; gap: 1px; flex-shrink: 0; }
+  .session-item:hover .move-btns, .session-item:focus-within .move-btns, .session-item.focused-split .move-btns { display: flex; }
+  .move-btns button { width: 26px; height: 18px; padding: 0; border: 1px solid var(--border); border-radius: 4px; background: var(--panel); color: var(--muted); font-size: 9px; line-height: 1; cursor: pointer; }
+  .move-btns button:hover { color: var(--text); border-color: var(--accent); }
+  .move-btns button:disabled { opacity: 0.35; cursor: default; }
+  @media (hover: none) { .session-item.active .move-btns { display: flex; } .move-btns button { width: 30px; height: 22px; font-size: 10px; } }
+  .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+  #new-session-area { padding: 10px 10px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid var(--border); }
+  #new-session-btn {
+    width: 100%; padding: 9px; border-radius: 8px; border: 1px dashed var(--border);
+    background: transparent; color: var(--text); font-size: 13px; cursor: pointer;
+  }
+  #new-session-btn:active { background: var(--panel2); }
+  #notify-toggle {
+    width: 100%; margin-top: 8px; padding: 7px; border-radius: 8px; border: 1px solid var(--border);
+    background: transparent; color: var(--muted); font-size: 12px; cursor: pointer;
+  }
+  #notify-toggle.on { color: var(--text); border-color: var(--accent); background: rgba(108,140,255,0.15); }
+
+  /* Spawn dialog */
+  #spawn-dialog {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: none;
+    align-items: center; justify-content: center; z-index: 50;
+  }
+  #spawn-dialog.open { display: flex; }
+  #spawn-box { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 18px; width: min(360px, 92vw); }
+  #spawn-box h2 { margin: 0 0 14px; font-size: 15px; }
+  .kind-toggle { display: flex; gap: 8px; margin-bottom: 12px; }
+  .kind-toggle button {
+    flex: 1; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--panel2);
+    color: var(--text); font-size: 13px; cursor: pointer;
+  }
+  .kind-toggle button.selected { border-color: var(--accent); background: rgba(108,140,255,0.15); }
+  #spawn-cwd { width: 100%; padding: 9px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--panel2); color: var(--text); font-size: 13px; margin-bottom: 10px; }
+  #spawn-resume { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); margin-bottom: 14px; cursor: pointer; }
+  #spawn-resume input { width: 16px; height: 16px; }
+  #cwd-presets { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+  #cwd-presets button { font-size: 11px; padding: 5px 9px; border-radius: 999px; border: 1px solid var(--border); background: var(--panel2); color: var(--muted); cursor: pointer; }
+  #spawn-actions { display: flex; gap: 8px; justify-content: flex-end; }
+  #spawn-actions button { padding: 9px 16px; border-radius: 8px; border: none; font-size: 13px; cursor: pointer; }
+  #spawn-cancel { background: var(--panel2); color: var(--text); }
+  #spawn-go { background: var(--accent); color: #fff; }
+
+  /* Main area */
+  #main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  #topbar {
+    display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border); background: var(--panel);
+    padding: calc(8px + env(safe-area-inset-top)) 10px 8px;
+  }
+  #hamburger { background: none; border: none; color: var(--text); font-size: 20px; padding: 8px 10px; cursor: pointer; line-height: 1; }
+  #topbar .title { font-size: 13px; color: var(--muted); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #font-controls { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+  #font-controls button {
+    background: var(--panel2); border: 1px solid var(--border); color: var(--text);
+    width: 28px; height: 28px; border-radius: 6px; font-size: 13px; cursor: pointer; line-height: 1;
+  }
+  #font-controls button:active { background: var(--accent); }
+
+  #mic-btn[hidden] { display: none; }
+  #mic-btn, #search-btn, #split-btn {
+    background: var(--panel2); border: 1px solid var(--border); color: var(--text);
+    width: 28px; height: 28px; border-radius: 6px; font-size: 13px; cursor: pointer; line-height: 1;
+    flex-shrink: 0; margin-right: 4px; display: flex; align-items: center; justify-content: center;
+  }
+  #mic-btn.recording { background: var(--danger); border-color: var(--danger); animation: mic-pulse 1.1s ease-in-out infinite; }
+  #mic-btn.busy { opacity: 0.5; cursor: default; }
+  #search-btn.active, #split-btn.active { border-color: var(--accent); background: rgba(108,140,255,0.15); }
+  @keyframes mic-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(255,92,92,0.5); } 50% { box-shadow: 0 0 0 6px rgba(255,92,92,0); } }
+
+  #search-bar {
+    display: none; align-items: center; gap: 6px; padding: 7px 10px; background: var(--panel);
+    border-bottom: 1px solid var(--border);
+  }
+  #search-bar.open { display: flex; }
+  #search-input {
+    flex: 1; padding: 6px 9px; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--panel2); color: var(--text); font-size: 13px;
+  }
+  #search-count { font-size: 11px; color: var(--muted); min-width: 46px; text-align: center; flex-shrink: 0; }
+  #search-bar button {
+    flex-shrink: 0; width: 28px; height: 28px; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--panel2); color: var(--text); font-size: 13px; cursor: pointer;
+  }
+
+  #reconnect-banner {
+    display: none; text-align: center; font-size: 11.5px; color: #1a1a26; background: #f0c14b;
+    padding: 5px; font-weight: 600;
+  }
+  #reconnect-banner.show { display: block; }
+
+  #term-container { flex: 1; position: relative; overflow: hidden; background: #000; }
+  .term-pane { position: absolute; inset: 0; padding: 6px 0 0 8px; display: none; }
+  .term-pane.active { display: block; }
+  #empty-state { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 12px; color: var(--muted); }
+  #empty-state button { padding: 10px 18px; border-radius: 8px; border: 1px solid var(--border); background: var(--panel2); color: var(--text); font-size: 13px; cursor: pointer; }
+
+  #split-container { display: none; position: absolute; inset: 0; }
+  #split-container.active { display: flex; }
+  .split-slot { flex: 1 1 0; min-width: 60px; position: relative; overflow: hidden; }
+  .split-slot .term-pane.split-child { position: absolute; inset: 0; padding: 6px 0 0 8px; display: block; }
+  .split-empty {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    color: var(--muted); font-size: 12.5px; text-align: center; padding: 20px; border-left: 1px dashed var(--border);
+  }
+  #split-divider { width: 6px; flex-shrink: 0; cursor: col-resize; background: var(--border); }
+  #split-divider:hover, #split-divider.dragging { background: var(--accent); }
+
+  /* Mobile key toolbar */
+  #key-toolbar {
+    display: flex; gap: 6px; background: var(--panel); border-top: 1px solid var(--border); overflow-x: auto;
+    padding: 7px 8px calc(7px + env(safe-area-inset-bottom));
+    -webkit-overflow-scrolling: touch;
+  }
+  #key-toolbar button {
+    flex-shrink: 0; padding: 10px 13px; border-radius: 7px; border: 1px solid var(--border); background: var(--panel2);
+    color: var(--text); font-size: 12.5px; font-family: monospace; cursor: pointer; min-width: 38px;
+  }
+  #key-toolbar button.wide { font-family: inherit; font-size: 12px; padding: 10px 14px; }
+  #key-toolbar button:active { background: var(--accent); }
+  #key-toolbar button.active { border-color: var(--accent); background: rgba(108,140,255,0.25); }
+  #key-toolbar .sep { flex-shrink: 0; width: 1px; background: var(--border); margin: 2px 2px; }
+
+  /* Compose row (mobile): a real textarea so the keyboard's autocorrect / suggestions / swipe typing can edit the text
+     before it reaches the shell. xterm's own hidden textarea streams each keystroke to the pty at once, which defeats them. */
+  #compose-bar { display: none; gap: 6px; align-items: flex-end; background: var(--panel); border-top: 1px solid var(--border); padding: 7px 8px 0; }
+  #compose-bar.open { display: flex; }
+  #compose-input {
+    flex: 1; min-width: 0; resize: none; box-sizing: border-box; padding: 8px 10px; border-radius: 7px;
+    border: 1px solid var(--border); background: var(--panel2); color: var(--text); font-size: 15px; line-height: 21px; font-family: monospace;
+  }
+  #compose-input:focus { outline: none; border-color: var(--accent); }
+  #compose-send { flex-shrink: 0; padding: 9px 14px; border-radius: 7px; border: 1px solid var(--accent); background: rgba(108,140,255,0.25); color: var(--text); font-size: 13px; cursor: pointer; }
+  #compose-send:active { background: var(--accent); }
+
+  #toast {
+    position: fixed; left: 50%; bottom: calc(70px + env(safe-area-inset-bottom)); transform: translateX(-50%) translateY(10px);
+    background: var(--panel2); border: 1px solid var(--border); color: var(--text); font-size: 12.5px;
+    padding: 9px 16px; border-radius: 999px; z-index: 60; opacity: 0; pointer-events: none; transition: opacity 0.2s, transform 0.2s;
+    max-width: 85vw; text-align: center;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  @media (min-width: 900px) {
+    #hamburger { display: none; }
+    #key-toolbar, #compose-bar { display: none !important; }
+  }
+  @media (max-width: 899px) {
+    #split-btn { display: none; } /* split view is a desktop-width feature */
+  }
+  @media (max-width: 899px) {
+    #sidebar { position: fixed; z-index: 40; height: 100dvh; }
+    #sidebar:not(.collapsed) { box-shadow: 2px 0 20px rgba(0,0,0,0.5); }
+    #sidebar.mobile-hidden { margin-left: -260px; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="sidebar-backdrop"></div>
+  <div id="sidebar" class="mobile-hidden">
+    <div id="sidebar-header">
+      <h1>Terminal Hub</h1>
+      <div id="conn-dot" title="disconnected"></div>
+    </div>
+    <div id="session-list" role="list"></div>
+    <div id="order-live" class="sr-only" aria-live="polite"></div>
+    <div id="new-session-area">
+      <button id="new-session-btn">+ New session</button>
+      <button id="notify-toggle" title="Alert me when a background session goes quiet or rings the bell">Notify: off</button>
+    </div>
+  </div>
+
+  <div id="main">
+    <div id="reconnect-banner">Reconnecting…</div>
+    <div id="topbar">
+      <button id="hamburger">☰</button>
+      <div class="title" id="topbar-title">No session open</div>
+      <button id="search-btn" title="Search scrollback (Ctrl/Cmd+Shift+F)">🔍</button>
+      <button id="split-btn" title="Split view (desktop)">⊟</button>
+      <button id="mic-btn" hidden title="Voice input (dictate into terminal)">🎤</button>
+      <div id="font-controls">
+        <button id="font-smaller" title="Smaller text">A−</button>
+        <button id="font-larger" title="Larger text">A+</button>
+      </div>
+    </div>
+    <div id="search-bar">
+      <input id="search-input" type="text" placeholder="Search scrollback…" />
+      <div id="search-count"></div>
+      <button id="search-prev" title="Previous (Shift+Enter)">↑</button>
+      <button id="search-next" title="Next (Enter)">↓</button>
+      <button id="search-close" title="Close (Esc)">✕</button>
+    </div>
+    <div id="term-container">
+      <div id="empty-state">
+        <div>No sessions yet</div>
+        <button id="empty-new-btn">+ New session</button>
+      </div>
+      <div id="split-container">
+        <div id="split-slot-a" class="split-slot"></div>
+        <div id="split-divider"></div>
+        <div id="split-slot-b" class="split-slot">
+          <div class="split-empty">Click a session in the sidebar to add it here</div>
+        </div>
+      </div>
+    </div>
+    <div id="compose-bar">
+      <textarea id="compose-input" rows="1" placeholder="Type here, Enter sends" autocomplete="off" autocorrect="on" spellcheck="true" autocapitalize="sentences" enterkeyhint="send"></textarea>
+      <button id="compose-send" type="button">Send</button>
+    </div>
+    <div id="key-toolbar">
+      <button class="wide" id="compose-btn" title="Compose bar: type with autocorrect and suggestions, Enter sends" aria-pressed="false">Aa</button>
+      <button class="wide" id="paste-btn">Paste</button>
+      <button class="wide" id="copy-btn">Copy</button>
+      <button class="wide" id="copy-screen-btn" title="Copy the visible screen text">Screen</button>
+      <button class="wide" id="select-btn" title="Select mode: drag to select text even while the app is capturing the mouse (same as holding Shift)">Select</button>
+      <div class="sep"></div>
+      <button data-key="Escape">Esc</button>
+      <button data-key="Tab">Tab</button>
+      <button data-key="ArrowUp">↑</button>
+      <button data-key="ArrowDown">↓</button>
+      <button data-key="ArrowLeft">←</button>
+      <button data-key="ArrowRight">→</button>
+      <div class="sep"></div>
+      <button data-ctrl="c">^C</button>
+      <button data-ctrl="d">^D</button>
+      <button data-ctrl="u">^U</button>
+      <button data-ctrl="r">^R</button>
+      <button data-key="Enter">⏎</button>
+    </div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<div id="spawn-dialog">
+  <div id="spawn-box">
+    <h2>New session</h2>
+    <div class="kind-toggle" id="agent-toggle"></div>
+    <input id="spawn-cwd" type="text" placeholder="Working directory (~)" />
+    <div id="cwd-presets"></div>
+    <label id="spawn-resume"><input type="checkbox" id="spawn-resume-cb" /> <span id="spawn-resume-text">Resume previous conversation</span></label>
+    <div id="spawn-actions">
+      <button id="spawn-cancel">Cancel</button>
+      <button id="spawn-go">Launch</button>
+    </div>
+  </div>
+</div>
+
+<script src="/vendor/xterm.js"></script>
+<script src="/vendor/addon-fit.js"></script>
+<script src="/vendor/addon-web-links.js"></script>
+<script src="/vendor/addon-search.js"></script>
+<script src="/vendor/addon-clipboard.js"></script>
+<script src="/vendor/addon-webgl.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  const params = new URLSearchParams(location.search);
+  let sessionParamUsed = false;
+  // Auth is a same-origin HttpOnly cookie set when the page is opened with ?token=; nothing secret lives in JS or localStorage.
+  let CWD_PRESETS = ["~"];
+  let AGENTS = [];
+  let GROUPS = [];
+  let selectedAgent = "";
+
+
+  // Labels added with sidebar groups + reordering, in English and Spanish
+  // (?ui=es|en, else the browser language). The rest of the page is English.
+  const UI_LANG = (params.get("ui") || navigator.language || "en").toLowerCase().startsWith("es") ? "es" : "en";
+  const L = {
+    en: { groupHub: "Sessions", moveUp: "Move up", moveDown: "Move down", dragHint: "Drag to reorder (long-press on a phone; Alt+↑/↓ with the keyboard)", moved: (n, m) => `Moved to position ${n} of ${m}` },
+    es: { groupHub: "Sesiones", moveUp: "Subir", moveDown: "Bajar", dragHint: "Arrastra para reordenar (mantén pulsado en el teléfono; Alt+↑/↓ con el teclado)", moved: (n, m) => `Movida a la posición ${n} de ${m}` },
+  }[UI_LANG];
+
+  // Sidebar order: the server's (shared by every device), as last received in pty_list.
+  let orderIds = [];
+  // A session's group is the label of a configured "watched tmux socket" ("" = the main Sessions group).
+  const groupOf = (entry) => (entry && entry.info.group) || "";
+  const isWatched = (entry) => groupOf(entry) !== "";
+  const groupKeys = () => ["", ...GROUPS];
+  /** Display order: main sessions, then each watched group in config order, each in the server order (unknown ones at the end). */
+  function displayOrder() {
+    const known = [...orderIds.filter((id) => sessions.has(id)), ...[...sessions.keys()].filter((id) => !orderIds.includes(id))];
+    const keys = groupKeys();
+    const rank = (id) => { const i = keys.indexOf(groupOf(sessions.get(id))); return i < 0 ? keys.length : i; };
+    return known.map((id, i) => [id, i]).sort((a, b) => rank(a[0]) - rank(b[0]) || a[1] - b[1]).map((x) => x[0]);
+  }
+
+  /** @type {Map<string, {info: object, term: any, fit: any, pane: HTMLElement, hasActivity: boolean}>} */
+  const sessions = new Map();
+  let activeId = null;
+  let ws = null;
+  let reconnectDelay = 1000;
+  let truncNoticeShown = false;
+
+  // Split view: [leftId, rightId], either may be null. When non-null,
+  // activeId tracks whichever slot was last focused/clicked — that's the
+  // target for the mobile key toolbar, mic, copy/paste, and search.
+  let splitMode = false;
+  let splitIds = [null, null];
+
+  // Sessions closed from this tab: the server now tombstones a killed
+  // session (status "exited") for a while rather than deleting it
+  // immediately (see pty-manager.ts), so a reconnect within that window
+  // would otherwise re-list it and the pty_list reconciliation below would
+  // recreate a pane for something the user just explicitly closed.
+  const closedByMe = new Set();
+
+  // Font size: shared across all sessions/tabs (persisted so it survives reloads).
+  const FONT_MIN = 9, FONT_MAX = 22;
+  let fontSize = parseInt(localStorage.getItem("agent_terminal_font_size"), 10) || 13;
+
+  // Custom session names: client-side labels keyed by session id, since the
+  // server only knows kind+cwd. Persisted so a rename survives reconnects
+  // and page reloads (sessions themselves persist server-side too).
+  let customNames = {};
+  try { customNames = JSON.parse(localStorage.getItem("agent_terminal_names") || "{}"); } catch (_) { customNames = {}; }
+  function saveCustomNames() {
+    try { localStorage.setItem("agent_terminal_names", JSON.stringify(customNames)); } catch (_) {}
+  }
+  function displayName(entry) {
+    // Server-side title (set via pty_rename, shared across devices) wins;
+    // localStorage names are only a fallback for sessions renamed before that existed.
+    if ((entry.info.titleCustom || isWatched(entry)) && entry.info.title) return entry.info.title; // a watched session's title comes from its own tmux session
+    return customNames[entry.info.id] || agentLabel(entry.info.agent);
+  }
+
+  const el = (id) => document.getElementById(id);
+  let toastTimer = null;
+  function showToast(msg) {
+    const t = el("toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove("show"), 2600);
+  }
+  const sidebar = el("sidebar");
+  const sidebarBackdrop = el("sidebar-backdrop");
+  const sessionList = el("session-list");
+  const termContainer = el("term-container");
+  const emptyState = el("empty-state");
+  const topbarTitle = el("topbar-title");
+  const connDot = el("conn-dot");
+  const spawnDialog = el("spawn-dialog");
+  const spawnCwd = el("spawn-cwd");
+  const cwdPresets = el("cwd-presets");
+
+  // Clipboard write that also works on plain-HTTP origins (navigator.clipboard
+  // needs a secure context; the LAN/Tailscale-IP URL usually isn't one).
+  // Optional native bridge for apps that wrap this page in a WebView: window.nativeClipboard (e.g. androidx.webkit
+  // addWebMessageListener) takes postMessage(string) and replies on its "message" event. Messages (JSON strings):
+  //   page -> app  {"t":"read","id":N}            app -> page  {"t":"clip","id":N,"text":"..."}
+  //   page -> app  {"t":"write","text":"..."}
+  // WebViews reject navigator.clipboard.readText(), so Paste asks the app. Absent in a normal browser: nothing changes.
+  const clipBridge = () => (window.nativeClipboard && typeof window.nativeClipboard.postMessage === "function" ? window.nativeClipboard : null);
+  const clipWaiters = new Map();
+  let clipSeq = 0;
+  (function () {
+    const b = clipBridge();
+    if (!b) return;
+    const onMsg = (ev) => {
+      let m; try { m = JSON.parse(ev.data); } catch (_) { return; }
+      const w = m && m.t === "clip" && clipWaiters.get(m.id);
+      if (w) { clipWaiters.delete(m.id); clearTimeout(w.timer); w.resolve(String(m.text || "")); }
+    };
+    if (b.addEventListener) b.addEventListener("message", onMsg); else b.onmessage = onMsg;
+  })();
+  // Resolves to the clipboard text, or null when it can't be read (the caller shows a toast).
+  function readClipboard() {
+    const browser = () => (navigator.clipboard && navigator.clipboard.readText ? navigator.clipboard.readText().catch(() => null) : Promise.resolve(null));
+    const b = clipBridge();
+    if (!b) return browser();
+    return new Promise((resolve) => {
+      const id = ++clipSeq;
+      const timer = setTimeout(() => { clipWaiters.delete(id); browser().then(resolve); }, 1500);
+      clipWaiters.set(id, { resolve, timer });
+      try { b.postMessage(JSON.stringify({ t: "read", id })); } catch (_) { clearTimeout(timer); clipWaiters.delete(id); browser().then(resolve); }
+    });
+  }
+
+  function copyText(text) {
+    const b = clipBridge();
+    if (b) { try { b.postMessage(JSON.stringify({ t: "write", text })); return Promise.resolve(true); } catch (_) { /* fall through */ } }
+    const legacy = () => {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.setAttribute("readonly", "");
+      ta.style.cssText = "position:fixed;top:0;left:0;opacity:0;";
+      const prev = document.activeElement;
+      document.body.appendChild(ta);
+      ta.select();
+      let ok = false;
+      try { ok = document.execCommand("copy"); } catch (_) {}
+      ta.remove();
+      if (prev && prev.focus) prev.focus();
+      return ok;
+    };
+    if (navigator.clipboard && window.isSecureContext) {
+      return navigator.clipboard.writeText(text).then(() => true, () => legacy());
+    }
+    return Promise.resolve(legacy());
+  }
+
+  // ─── WebSocket ──────────────────────────────────────
+  function wsUrl() {
+    const proto = location.protocol === "https:" ? "wss:" : "ws:";
+    return `${proto}//${location.host}/ws`;
+  }
+
+  function connect() {
+    ws = new WebSocket(wsUrl());
+    ws.onopen = () => {
+      connDot.classList.add("up");
+      el("reconnect-banner").classList.remove("show");
+      reconnectDelay = 1000;
+      send({ type: "pty_list" });
+      // Re-attach any panes that survived a reconnect (page not reloaded, ws dropped).
+      for (const id of sessions.keys()) send({ type: "pty_attach", sessionId: id });
+    };
+    ws.onclose = () => {
+      connDot.classList.remove("up");
+      el("reconnect-banner").classList.add("show");
+      setTimeout(connect, reconnectDelay);
+      reconnectDelay = Math.min(reconnectDelay * 1.6, 15000);
+    };
+    ws.onerror = () => { try { ws.close(); } catch (_) {} };
+    ws.onmessage = (ev) => {
+      let msg;
+      try { msg = JSON.parse(ev.data); } catch (_) { return; }
+      handleMessage(msg);
+    };
+  }
+
+  function send(obj) {
+    if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(obj));
+  }
+
+  function handleMessage(msg) {
+    switch (msg.type) {
+      case "pty_list": {
+        // Server's source of truth for what's running (covers other devices /
+        // sessions spawned before this tab connected). Add any we don't know yet.
+        const serverIds = new Set(msg.sessions.map((s) => s.id));
+        for (const id of closedByMe) { if (!serverIds.has(id)) closedByMe.delete(id); } // server finally reaped it
+        for (const info of msg.sessions) {
+          if (closedByMe.has(info.id)) continue;
+          if (!sessions.has(info.id)) ensurePane(info, false);
+          else sessions.get(info.id).info = info;
+          const le = sessions.get(info.id);
+          if (le && info.lastOutputAt) le.lastOutputAt = Math.max(le.lastOutputAt || 0, info.lastOutputAt);
+        }
+        // Anything local the server no longer lists is gone for good (killed
+        // from another tab/device and reaped, or killed while we were
+        // disconnected) — without this a stale sidebar entry could sit there
+        // showing "running" forever with no output and no way to know it's
+        // dead short of a full page reload.
+        for (const id of [...sessions.keys()]) {
+          if (!serverIds.has(id)) forgetLocalSession(id);
+        }
+        orderIds = msg.sessions.map((s) => s.id);
+        if (!drag) renderSidebar();
+        // ?session=<id> (e.g. coming back from voice-desk): focus that session once.
+        const want = params.get("session");
+        if (want && sessions.has(want) && !sessionParamUsed) { sessionParamUsed = true; if (activeId !== want) activate(want); }
+        const act = activeId && sessions.get(activeId);
+        if (act) topbarTitle.textContent = `${displayName(act)} — ${act.info.cwd}`;
+        break;
+      }
+      case "pty_spawned":
+        if (!orderIds.includes(msg.session.id)) orderIds.push(msg.session.id); // new sessions go at the end
+        ensurePane(msg.session, true);
+        if (splitMode) exitSplit();
+        activate(msg.session.id);
+        renderSidebar();
+        break;
+      case "pty_scrollback": {
+        // Always reset + replay the server's canonical buffer on every
+        // attach, not just the first one. A one-shot "hasScrollback" latch
+        // here meant a SECOND reconnect (phone backgrounds, wifi blips
+        // twice) got the server's full up-to-date scrollback and silently
+        // discarded it — everything printed during the gap was gone for
+        // good, defeating the whole point of server-side session
+        // persistence. Reset-then-replay is idempotent (a reconnect where
+        // nothing changed just redraws the same content) so there's no
+        // dedup logic to get subtly wrong.
+        const s = sessions.get(msg.sessionId);
+        if (s) {
+          s.term.reset();
+          if (msg.data) s.term.write(msg.data);
+          // The server only applies the size of the client in use and drops a
+          // client's size when it disconnects, so re-announce ours after every
+          // (re)attach: onResize alone never fires if the fit didn't change.
+          send({ type: "pty_resize", sessionId: msg.sessionId, cols: s.term.cols, rows: s.term.rows });
+          // Server sends only the recent tail on attach (full buffer stays
+          // server-side); tell the user once per page load, not per reconnect.
+          if (msg.truncated && !truncNoticeShown) {
+            truncNoticeShown = true;
+            showToast("Earlier output truncated (showing the most recent part)");
+          }
+        }
+        break;
+      }
+      case "pty_output": {
+        const s = sessions.get(msg.sessionId);
+        if (s) {
+          s.term.write(msg.data);
+          s.lastOutputAt = Date.now();
+          trackAttention(msg.sessionId, s, msg.data);
+          if (msg.sessionId !== activeId && !s.hasActivity) {
+            s.hasActivity = true;
+            renderSidebar();
+          }
+        }
+        break;
+      }
+      case "pty_exit": {
+        const s = sessions.get(msg.sessionId);
+        if (s) {
+          clearTimeout(s.quietTimer); // nothing left to wait for
+          s.info.status = "exited";
+          s.info.exitCode = msg.code;
+          s.term.write(`\r\n\x1b[38;5;244m[process exited, code ${msg.code}]\x1b[0m\r\n`);
+          renderSidebar();
+        }
+        break;
+      }
+      case "pty_error":
+        showToast("Terminal error: " + msg.message);
+        break;
+    }
+  }
+
+  // ─── Terminal panes ─────────────────────────────────
+  function ensurePane(info, isFresh) {
+    if (sessions.has(info.id)) return sessions.get(info.id);
+    const pane = document.createElement("div");
+    pane.className = "term-pane";
+    pane.id = "pane-" + info.id;
+    termContainer.appendChild(pane);
+
+    const term = new Terminal({
+      cursorBlink: true,
+      fontSize: fontSize,
+      fontFamily: "SF Mono, Menlo, Consolas, monospace",
+      theme: { background: "#000000", foreground: "#d8d8e2" },
+      scrollback: 5000,
+      allowProposedApi: true,
+    });
+    const fit = new FitAddon.FitAddon();
+    term.loadAddon(fit);
+    term.loadAddon(new WebLinksAddon.WebLinksAddon((_ev, uri) => window.open(uri, "_blank", "noopener,noreferrer")));
+    const search = new SearchAddon.SearchAddon();
+    term.loadAddon(search);
+    search.onDidChangeResults((res) => {
+      if (info.id !== activeId) return;
+      const countEl = document.getElementById("search-count");
+      if (!countEl) return;
+      countEl.textContent = res && res.resultCount ? `${res.resultIndex + 1}/${res.resultCount}` : "0/0";
+    });
+    // OSC 52: lets TUIs (Claude Code, pi, tmux, vim) put text on the clipboard.
+    // Writes only: a custom provider refuses reads so a program in the pty
+    // can't silently exfiltrate whatever is on the user's clipboard.
+    term.loadAddon(new ClipboardAddon.ClipboardAddon(undefined, {
+      writeText: (sel, text) => { if (sel === "c" || sel === "") copyText(text); },
+      readText: () => "",
+    }));
+    // Copy-on-select (debounced so a drag doesn't copy every intermediate state).
+    let selTimer = null;
+    // Skipped on touch screens: dragging selection handles fires this repeatedly,
+    // and Android keyboards (Gboard) keep a clipboard history, so every partial
+    // selection would pile up there. Mobile uses the Copy button instead.
+    const coarsePointer = window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
+    term.onSelectionChange(() => {
+      if (coarsePointer) return;
+      clearTimeout(selTimer);
+      selTimer = setTimeout(() => {
+        const t = term.getSelection();
+        if (t) copyText(t);
+      }, 150);
+    });
+    term.open(pane);
+
+    // GPU renderer: much smoother on big redraws (Claude Code's TUI repaints
+    // a lot). Strictly best-effort: no WebGL (old phone, blocked context, GPU
+    // process crash) must silently leave the DOM renderer in place, and a
+    // lost context is disposed rather than left rendering a black pane.
+    try {
+      const webgl = new WebglAddon.WebglAddon();
+      webgl.onContextLoss(() => { try { webgl.dispose(); } catch (_) {} });
+      term.loadAddon(webgl);
+    } catch (_) { /* DOM renderer fallback */ }
+
+    // Android soft keyboards (Gboard/SwiftKey) compose words inside xterm's hidden helper textarea. xterm.js has several
+    // overlapping input paths for that (compositionend, input "insertText", keydown-229 value diff) whose guards Android's
+    // event orders defeat: composed text was sent repeatedly and half-typed words leaked ("durin"), e.g. "not sure" became
+    // "in not durin not sure sure ...". No dedup window fixes that reliably, so on Android we take the textarea over:
+    // capture-phase listeners swallow the IME events before xterm sees them, the browser still edits the textarea normally
+    // (so the keyboard keeps a consistent field), and each `input` event is mirrored to the pty as a diff against what was
+    // already sent (backspaces for removed chars, then the new suffix). Suggestion taps and autocorrect become
+    // "backspaces + new word", and nothing can be sent twice because the textarea value is the single source of truth.
+    // Detected by user agent, not (pointer: coarse): the bug is Android-IME specific and coarse also matches iPads and
+    // touch laptops, whose keyboards work fine through xterm's normal path (which desktop keeps untouched).
+    const androidIme = /Android/i.test(navigator.userAgent) && !!term.textarea && !!term.element;
+    let resetMirror = () => {};
+    if (androidIme) {
+      const ta = term.textarea;
+      let sent = "", composing = false, lastPasteText = "", lastPasteAt = 0;
+      const sendPty = (data) => { if (data) send({ type: "pty_input", sessionId: info.id, data }); };
+      resetMirror = (force) => { if (composing && !force) return; sent = ""; if (ta.value) ta.value = ""; };
+      // Send what changed since the last sync: DEL per removed code point (not UTF-16 unit), then the added text.
+      const sync = () => {
+        const a = Array.from(sent), b = Array.from(ta.value);
+        let i = 0;
+        while (i < a.length && i < b.length && a[i] === b[i]) i++;
+        sendPty("\x7f".repeat(a.length - i) + b.slice(i).join(""));
+        sent = ta.value;
+      };
+      const enter = () => { sync(); sendPty("\r"); sent = ""; ta.value = ""; };
+      const swallow = (ev) => { if (ev.target === ta) ev.stopImmediatePropagation(); return ev.target === ta; };
+      const MODIFIER_KEYS = new Set(["Shift", "Control", "Alt", "Meta", "CapsLock", "AltGraph", "Dead"]);
+      const on = (type, fn) => term.element.addEventListener(type, fn, true);
+      on("keydown", (ev) => {
+        if (ev.target !== ta) return;
+        const ime = ev.keyCode === 229 || ev.key === "Process" || ev.key === "Unidentified";
+        if (ev.key === "Enter" && !ime) { ev.preventDefault(); ev.stopImmediatePropagation(); enter(); return; }
+        if (ev.key === "Backspace" && !ime) {
+          // Empty textarea: nothing for the browser to delete, so delete in the shell. Otherwise the edit + diff does it.
+          if (!ta.value) { ev.preventDefault(); sendPty("\x7f"); }
+          ev.stopImmediatePropagation();
+          return;
+        }
+        if (ime || (ev.key.length === 1 && !ev.ctrlKey && !ev.altKey && !ev.metaKey)) { ev.stopImmediatePropagation(); return; }
+        // Arrows, Tab, Esc, Home/End, Ctrl/Alt combos: xterm sends these itself; the mirror would be stale afterwards.
+        if (!MODIFIER_KEYS.has(ev.key)) resetMirror();
+      });
+      on("keypress", swallow);
+      on("beforeinput", (ev) => {
+        if (!swallow(ev)) return;
+        if (ev.inputType === "insertLineBreak" || ev.inputType === "insertParagraph") { ev.preventDefault(); enter(); }
+        else if (ev.inputType === "deleteContentBackward" && !ta.value) { ev.preventDefault(); sendPty("\x7f"); }
+      });
+      on("compositionstart", (ev) => { if (swallow(ev)) composing = true; });
+      on("compositionupdate", swallow);
+      on("compositionend", (ev) => { if (swallow(ev)) composing = false; });
+      on("input", (ev) => {
+        if (!swallow(ev)) return;
+        sync();
+        // Keep the textarea from growing forever, but never while the keyboard is mid-composition.
+        if (!composing && !ev.isComposing && ta.value.length > 200) { sent = ""; ta.value = ""; }
+      });
+      // The browser would insert the text into the textarea and the diff would send it a second time: paste it ourselves.
+      on("paste", (ev) => {
+        if (ev.target !== ta) return;
+        ev.preventDefault(); ev.stopImmediatePropagation();
+        const text = ev.clipboardData ? ev.clipboardData.getData("text") : "";
+        const now = Date.now();
+        // Gboard's clipboard chip can deliver the same paste twice.
+        if (!text || (text === lastPasteText && now - lastPasteAt < 1000)) return;
+        lastPasteText = text; lastPasteAt = now;
+        sync(); term.paste(text); resetMirror(true);
+      });
+      // Focus (session switch, programmatic term.focus()) starts a fresh line segment.
+      ta.addEventListener("focus", () => resetMirror());
+    }
+    // Composition de-dup, for non-Android only (see above: on Android xterm no longer sees IME events). Only acts within a
+    // short window after a real `compositionend`, not for any repeated multi-character chunk: an earlier version keyed
+    // on "identical data within 250ms" and extended its own window on every drop, which suppressed held arrow keys.
+    let inComposition = false, compositionEndedAt = 0, lastComposedData = "";
+    if (term.textarea && !androidIme) {
+      term.textarea.addEventListener("compositionstart", () => { inComposition = true; });
+      term.textarea.addEventListener("compositionend", () => { inComposition = false; compositionEndedAt = Date.now(); });
+    }
+    const COMPOSITION_DEDUP_WINDOW_MS = 250;
+    // Paste de-dup: Gboard's clipboard chip / paste action can deliver the same
+    // paste twice (two paste events, or paste plus an input commit). Drop an
+    // identical multi-char chunk arriving within a second of the last one,
+    // but only right after a real paste event so held keys / key-repeat and
+    // legitimate repeated commands are never affected.
+    const PASTE_DEDUP_WINDOW_MS = 1000;
+    let lastPasteEventAt = 0, lastPasteData = "", lastPasteDataAt = 0;
+    if (term.textarea) {
+      term.textarea.addEventListener("paste", () => { lastPasteEventAt = Date.now(); }, true);
+    }
+    term.onData((data) => {
+      const now = Date.now();
+      if (data.length > 1 && now - lastPasteEventAt < PASTE_DEDUP_WINDOW_MS) {
+        if (data === lastPasteData && now - lastPasteDataAt < PASTE_DEDUP_WINDOW_MS) return;
+        lastPasteData = data; lastPasteDataAt = now;
+      }
+      const nearComposition = !inComposition && Date.now() - compositionEndedAt < COMPOSITION_DEDUP_WINDOW_MS;
+      if (nearComposition && data.length > 1 && data === lastComposedData) return;
+      if (nearComposition) lastComposedData = data;
+      send({ type: "pty_input", sessionId: info.id, data });
+    });
+    term.onResize(({ cols, rows }) => send({ type: "pty_resize", sessionId: info.id, cols, rows }));
+
+    // In split view both panes are visible at once, so clicking into either
+    // one is what determines which session the toolbar/mic/search/shortcuts
+    // act on (there's no single "activate" to do that, unlike normal mode).
+    pane.addEventListener("mousedown", () => {
+      if (splitMode && splitIds.includes(info.id) && activeId !== info.id) {
+        activeId = info.id;
+        const e = sessions.get(info.id);
+        if (e) { e.hasActivity = false; topbarTitle.textContent = `${displayName(e)} — ${e.info.cwd}`; }
+        renderSidebar();
+      }
+    }, { capture: true });
+
+    const entry = { info, term, fit, search, pane, resetMirror, hasActivity: false, lastOutputAt: info.lastOutputAt || Date.now() };
+    sessions.set(info.id, entry);
+    if (!isFresh) send({ type: "pty_attach", sessionId: info.id });
+    return entry;
+  }
+
+  function activate(id) {
+    const entry = sessions.get(id);
+    if (!entry) return;
+    activeId = id;
+    entry.hasActivity = false;
+    clearWaiting(entry);
+    for (const s of sessions.values()) s.pane.classList.remove("active");
+    entry.pane.classList.add("active");
+    emptyState.style.display = "none";
+    topbarTitle.textContent = `${displayName(entry)} — ${entry.info.cwd}`;
+    requestAnimationFrame(() => { entry.fit.fit(); entry.term.focus(); });
+    renderSidebar();
+    closeSidebarOnMobile();
+  }
+
+  // Tears down a session's local UI state (pane/term/split/activeId
+  // fallback) without touching the server — used both when the user
+  // explicitly closes a session here, and when reconciling pty_list finds
+  // one that's gone server-side (killed from another tab/device, or
+  // reaped after being exited long enough — see pty-manager.ts).
+  function forgetLocalSession(id) {
+    if (splitMode && splitIds.includes(id)) exitSplit();
+    const entry = sessions.get(id);
+    if (entry) {
+      clearTimeout(entry.quietTimer); // a closed-by-me session must never notify
+      entry.term.dispose(); entry.pane.remove(); sessions.delete(id); }
+    if (customNames[id]) { delete customNames[id]; saveCustomNames(); }
+    if (activeId === id) {
+      activeId = null;
+      const next = displayOrder()[0];
+      if (next) activate(next);
+      else { topbarTitle.textContent = "No session open"; emptyState.style.display = "flex"; }
+    }
+  }
+
+  function closeSession(id) {
+    // An already-exited session is just a tombstone: closing it loses nothing,
+    // so no prompt. A RUNNING one keeps the confirm (a mis-tap on the small
+    // phone X must not kill an agent mid-task) and names the session + cwd so
+    // you can tell which one you are about to end.
+    const entry = sessions.get(id);
+    if (entry && entry.info.status === "running" &&
+        !confirm(`End "${displayName(entry)}" in ${shortenCwd(entry.info.cwd)}?\nThe running process will be terminated.`)) return;
+    send({ type: "pty_kill", sessionId: id });
+    closedByMe.add(id);
+    forgetLocalSession(id);
+    renderSidebar();
+  }
+
+  // ─── "Waiting for you" notifications ─────────────────────────────────
+  // A session needs attention when it printed something and then went quiet
+  // (agent finished / asking a question), or explicitly rang the bell / sent
+  // an OSC 9 or OSC 777 desktop-notification sequence. Only fires while you
+  // are NOT looking at it (tab hidden, or another session is active), so the
+  // session you are typing in never nags. Detected client-side because
+  // visibility is a client fact; every attached tab does its own detection.
+  const QUIET_MS = 8000, NOTIFY_COOLDOWN_MS = 30000;
+  const NOTIFY_KEY = "agent_terminal_notify";
+  let notifyOn = false;
+  try { notifyOn = localStorage.getItem(NOTIFY_KEY) === "1"; } catch (_) {}
+  const notifyBtn = el("notify-toggle");
+  function renderNotifyBtn() {
+    notifyBtn.textContent = "Notify: " + (notifyOn ? "on" : "off");
+    notifyBtn.classList.toggle("on", notifyOn);
+  }
+  renderNotifyBtn();
+  notifyBtn.addEventListener("click", async () => {
+    if (!notifyOn) {
+      // Permission is requested lazily, here, because browsers only honor the
+      // prompt from a user gesture (and mobile ones ignore it otherwise).
+      if (!("Notification" in window)) { showToast("Notifications not supported here (badge only)"); }
+      else if (Notification.permission === "default") {
+        try { await Notification.requestPermission(); } catch (_) {}
+      }
+      if ("Notification" in window && Notification.permission === "denied") showToast("Notifications blocked in browser settings (badge only)");
+      notifyOn = true;
+    } else {
+      notifyOn = false;
+    }
+    try { localStorage.setItem(NOTIFY_KEY, notifyOn ? "1" : "0"); } catch (_) {}
+    renderNotifyBtn();
+  });
+
+  function isBeingWatched(id) {
+    if (document.hidden) return false;
+    return splitMode ? splitIds.includes(id) : id === activeId;
+  }
+  function updateTitleBadge() {
+    const n = [...sessions.values()].filter((s) => s.waiting).length;
+    document.title = (n ? `(${n}) ` : "") + "Terminal Hub";
+  }
+  function clearWaiting(entry) {
+    if (!entry.waiting) return;
+    entry.waiting = false;
+    updateTitleBadge();
+  }
+  function raiseAttention(id, entry, why) {
+    if (isBeingWatched(id)) return;
+    const now = Date.now();
+    // Debounce: one alert per cooldown per session, however chatty it is.
+    if (now - (entry.lastNotifyAt || 0) < NOTIFY_COOLDOWN_MS) return;
+    entry.lastNotifyAt = now;
+    entry.waiting = true;
+    updateTitleBadge();
+    renderSidebar();
+    if (!notifyOn || !("Notification" in window) || Notification.permission !== "granted") return;
+    try {
+      const n = new Notification(`${displayName(entry)} is waiting`, { body: why, tag: "pty-" + id });
+      n.onclick = () => { window.focus(); if (splitMode) exitSplit(); activate(id); n.close(); };
+    } catch (_) { /* Android Chrome throws without a service worker: badge + title still work */ }
+  }
+  // Bare BEL vs the BEL that merely terminates an OSC sequence (title/clipboard
+  // updates end in \x07 constantly), so OSC bodies are removed before looking.
+  const OSC_RE = /\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g;
+  function trackAttention(id, entry, data) {
+    if (data.indexOf("\x1b]") !== -1) {
+      for (const m of data.matchAll(/\x1b\](?:9;([^\x07\x1b]*)|777;notify;([^\x07\x1b]*))(?:\x07|\x1b\\)/g)) {
+        // OSC 9;4;... is the ConEmu/Windows-Terminal progress-bar protocol that
+        // TUIs emit continuously while working: not a notification.
+        if (m[1] !== undefined && /^[0-9];/.test(m[1])) continue;
+        const body = (m[1] || (m[2] || "").replace(/;/g, " — ")).trim();
+        raiseAttention(id, entry, body || "Notification from session");
+      }
+    }
+    if (data.indexOf("\x07") !== -1 && data.replace(OSC_RE, "").indexOf("\x07") !== -1) {
+      raiseAttention(id, entry, "Bell");
+    }
+    // Quiet detection: every chunk pushes the deadline out, so a streaming
+    // session never fires; it fires once ~8s after the last byte.
+    clearTimeout(entry.quietTimer);
+    entry.quietTimer = setTimeout(() => {
+      if (entry.info.status === "running") raiseAttention(id, entry, "Went quiet: probably needs your input");
+    }, QUIET_MS);
+  }
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden && activeId) { const e = sessions.get(activeId); if (e) { clearWaiting(e); renderSidebar(); } }
+  });
+
+  // ─── Split view (desktop): two sessions side by side ─────────────────
+  const splitContainer = el("split-container");
+  const splitSlotA = el("split-slot-a");
+  const splitSlotB = el("split-slot-b");
+  const splitDivider = el("split-divider");
+  const splitBtn = el("split-btn");
+
+  function enterSplit() {
+    if (!activeId) return;
+    if (sessions.size < 2) { showToast("Spawn a second session first"); return; }
+    splitMode = true;
+    splitIds = [activeId, null];
+    splitBtn.classList.add("active");
+    emptyState.style.display = "none";
+    splitContainer.classList.add("active");
+    const a = sessions.get(activeId);
+    a.pane.classList.remove("active");
+    a.pane.classList.add("split-child");
+    splitSlotA.appendChild(a.pane);
+    splitSlotB.innerHTML = '<div class="split-empty">Click a session in the sidebar to add it here</div>';
+    requestAnimationFrame(() => a.fit.fit());
+    renderSidebar();
+  }
+
+  function assignToSplit(id) {
+    if (id === splitIds[0]) return; // already the primary pane, nothing to do
+    const prevB = splitIds[1];
+    if (prevB && prevB !== id) {
+      const prevEntry = sessions.get(prevB);
+      if (prevEntry) { prevEntry.pane.classList.remove("split-child"); termContainer.appendChild(prevEntry.pane); }
+    }
+    splitIds[1] = id;
+    const b = sessions.get(id);
+    if (!b) return;
+    b.pane.classList.remove("active");
+    b.pane.classList.add("split-child");
+    splitSlotB.innerHTML = "";
+    splitSlotB.appendChild(b.pane);
+    activeId = id;
+    b.hasActivity = false;
+    requestAnimationFrame(() => b.fit.fit());
+    renderSidebar();
+  }
+
+  function exitSplit() {
+    if (!splitMode) return;
+    splitMode = false;
+    splitBtn.classList.remove("active");
+    splitContainer.classList.remove("active");
+    const keepId = activeId && splitIds.includes(activeId) ? activeId : splitIds[0];
+    for (const id of splitIds) {
+      if (!id) continue;
+      const entry = sessions.get(id);
+      if (!entry) continue;
+      entry.pane.classList.remove("split-child", "active");
+      termContainer.appendChild(entry.pane);
+    }
+    splitSlotB.innerHTML = '<div class="split-empty">Click a session in the sidebar to add it here</div>';
+    splitIds = [null, null];
+    if (keepId && sessions.has(keepId)) activate(keepId);
+    else { activeId = null; topbarTitle.textContent = "No session open"; emptyState.style.display = sessions.size ? "none" : "flex"; }
+  }
+
+  splitBtn.addEventListener("click", () => { splitMode ? exitSplit() : enterSplit(); });
+
+  (function setupSplitDivider() {
+    let dragging = false;
+    splitDivider.addEventListener("mousedown", (e) => {
+      dragging = true;
+      splitDivider.classList.add("dragging");
+      e.preventDefault();
+    });
+    window.addEventListener("mousemove", (e) => {
+      if (!dragging) return;
+      const rect = splitContainer.getBoundingClientRect();
+      const pct = Math.min(80, Math.max(20, ((e.clientX - rect.left) / rect.width) * 100));
+      splitSlotA.style.flex = `0 0 ${pct}%`;
+      splitSlotB.style.flex = `1 1 auto`;
+    });
+    window.addEventListener("mouseup", () => {
+      if (!dragging) return;
+      dragging = false;
+      splitDivider.classList.remove("dragging");
+      for (const id of splitIds) { const e = id && sessions.get(id); if (e) e.fit.fit(); }
+    });
+  })();
+
+  function renderSidebar() {
+    if (drag || pressing) { renderPending = true; return; } // never rebuild under a finger / mouse in the middle of a press or drag (it re-renders when that ends)
+    renderPending = false;
+    const ae = document.activeElement, focusId = ae && ae.classList && ae.classList.contains("session-item") && sessionList.contains(ae) ? ae.dataset.id : null; // keyboard reordering keeps focus across the server's broadcast
+    sessionList.innerHTML = "";
+    const ids = displayOrder();
+    const groups = groupKeys().map((g, gi) => [g, gi, ids.filter((id) => groupOf(sessions.get(id)) === g)]);
+    const headed = groups.some(([g, , gids]) => g !== "" && gids.length > 0); // with no watched sessions the sidebar has no headers
+    for (const [g, gi, gids] of groups) {
+      if (!gids.length) continue;
+      if (headed) {
+        const h = document.createElement("div");
+        h.className = "group-h"; h.id = "group-h-" + gi;
+        h.innerHTML = `<span>${escapeHtml(g === "" ? L.groupHub : g)}</span><span class="n">${gids.length}</span>`;
+        sessionList.appendChild(h);
+      }
+      const box = document.createElement("div");
+      box.className = "group"; box.dataset.group = g === "" ? "main" : g; box.setAttribute("role", "group");
+      if (headed) box.setAttribute("aria-labelledby", "group-h-" + gi);
+      gids.forEach((id, i) => box.appendChild(sessionItem(id, i, gids.length)));
+      sessionList.appendChild(box);
+    }
+    if (focusId) { const it = sessionList.querySelector(`.session-item[data-id="${CSS.escape(focusId)}"]`); if (it) it.focus({ preventScroll: true }); }
+  }
+
+  function sessionItem(id, pos, count) {
+    const s = sessions.get(id);
+    const item = document.createElement("div");
+    const isHighlighted = splitMode ? splitIds.includes(id) : id === activeId;
+    item.className = "session-item" + (isHighlighted ? " active" : "") + (id === activeId ? " focused-split" : "") + (s.info.status === "exited" ? " exited" : "");
+    item.dataset.id = id;
+    item.tabIndex = 0;
+    item.setAttribute("role", "listitem");
+    item.title = L.dragHint;
+    item.innerHTML = `
+      <div class="session-kind-dot" style="background:${agentColor(s.info.agent)}"></div>
+      <div class="meta">
+        <div class="title-row">
+          <div class="title" data-title>${escapeHtml(displayName(s))}</div>
+          <div class="rename-btn" data-rename="${id}" title="Rename">✎</div>
+          ${s.waiting ? '<div class="waiting-badge" title="Waiting for you">WAITING</div>' : ""}
+          ${s.hasActivity ? '<div class="activity-dot" title="New output"></div>' : ""}
+        </div>
+        <div class="sub">${escapeHtml(shortenCwd(s.info.cwd))}${s.info.status === "exited" ? " · exited" : ""}<span class="age" data-age="${id}">${ageLabel(s)}</span></div>
+      </div>
+      <div class="move-btns"><button type="button" data-move="-1" aria-label="${escapeHtml(L.moveUp)}" title="${escapeHtml(L.moveUp)} (Alt+↑)" ${pos === 0 ? "disabled" : ""}>▲</button><button type="button" data-move="1" aria-label="${escapeHtml(L.moveDown)}" title="${escapeHtml(L.moveDown)} (Alt+↓)" ${pos === count - 1 ? "disabled" : ""}>▼</button></div>
+      ${s.info.status === "exited" && !isWatched(s) ? `<div class="restart-btn" data-restart="${id}" title="Restart (same agent + folder)">↻</div>` : ""}
+      <div class="close-btn" data-close="${id}">✕</div>
+    `;
+    item.addEventListener("click", (e) => {
+      if (dragJustEnded) return; // the click that ends a drag is not a selection
+      if (e.target.closest("[data-close], [data-rename], [data-restart], [data-move], input")) return;
+      if (splitMode) {
+        if (splitIds.includes(id)) { activeId = id; renderSidebar(); }
+        else assignToSplit(id);
+      } else {
+        activate(id);
+      }
+    });
+    item.addEventListener("keydown", (e) => {
+      if (e.target !== item) return; // typing in a rename box
+      if (e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) { e.preventDefault(); moveBy(id, e.key === "ArrowUp" ? -1 : 1); return; }
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); item.click(); }
+    });
+    item.querySelector("[data-close]").addEventListener("click", (e) => {
+      e.stopPropagation();
+      closeSession(id);
+    });
+    const restartBtn = item.querySelector("[data-restart]");
+    if (restartBtn) restartBtn.addEventListener("click", (e) => { e.stopPropagation(); restartSession(id); });
+    item.querySelector("[data-rename]").addEventListener("click", (e) => {
+      e.stopPropagation();
+      startRename(id, item);
+    });
+    for (const b of item.querySelectorAll("[data-move]")) b.addEventListener("click", (e) => { e.stopPropagation(); moveBy(id, Number(b.dataset.move)); });
+    item.addEventListener("pointerdown", (e) => dragStart(e, item, id));
+    item.addEventListener("contextmenu", (e) => { if (drag || pressTimer) e.preventDefault(); }); // a long-press must not open the phone's context menu
+    return item;
+  }
+
+  // ─── Reordering: drag and drop (mouse + touch long-press) and keyboard ───
+  // The new order goes to the server (pty_order), which stores it and pushes
+  // the list to every device. Sessions only move inside their own group.
+  let drag = null, pressTimer = null, dragJustEnded = false, pressing = false, renderPending = false;
+  const LONG_PRESS_MS = 420, MOVE_SLOP = 8;
+  function sendOrder(ids, movedId) {
+    orderIds = ids;
+    send({ type: "pty_order", order: ids });
+    renderSidebar();
+    if (movedId) {
+      const it = sessionList.querySelector(`.session-item[data-id="${CSS.escape(movedId)}"]`);
+      if (it) { it.focus({ preventScroll: true }); it.scrollIntoView({ block: "nearest" }); }
+      const g = it && it.parentElement, items = g ? [...g.querySelectorAll(".session-item")] : [];
+      el("order-live").textContent = L.moved(items.indexOf(it) + 1, items.length);
+    }
+  }
+  function moveBy(id, delta) {
+    const ids = displayOrder(), cc = groupOf(sessions.get(id));
+    const same = ids.filter((x) => groupOf(sessions.get(x)) === cc);
+    const i = same.indexOf(id), j = i + delta;
+    if (i < 0 || j < 0 || j >= same.length) return;
+    [same[i], same[j]] = [same[j], same[i]];
+    const keys = groupKeys(), buckets = keys.map((k) => (k === cc ? same : ids.filter((x) => groupOf(sessions.get(x)) === k)));
+    sendOrder(buckets.flat(), id);
+  }
+  function dragStart(e, item, id) {
+    if (e.button !== 0 || drag || e.target.closest("[data-close], [data-rename], [data-restart], [data-move], input")) return;
+    const p0 = { x: e.clientX, y: e.clientY, pid: e.pointerId };
+    const touch = e.pointerType !== "mouse";
+    const cancelPress = () => {
+      clearTimeout(pressTimer); pressTimer = null; item.classList.remove("press"); pressing = false;
+      window.removeEventListener("pointermove", pre); window.removeEventListener("pointerup", cancelPress); window.removeEventListener("pointercancel", cancelPress);
+      if (renderPending && !drag) setTimeout(() => { if (!drag && !pressing) renderSidebar(); }, 0); // after the click handler ran on the old row
+    };
+    const begin = () => {
+      cancelPress();
+      if (!item.isConnected) return; // the list was rebuilt under the press: no drag
+      const box = item.parentElement;
+      drag = { id, item, box, pid: p0.pid, startY: p0.y, lastY: p0.y, before: [...box.children].map((x) => x.dataset.id), moved: false };
+      item.classList.add("dragging");
+      sessionList.classList.add("reordering");
+      try { item.setPointerCapture(p0.pid); } catch (_) {}
+      if (touch && navigator.vibrate) { try { navigator.vibrate(15); } catch (_) {} }
+      window.addEventListener("pointermove", dragMove);
+      window.addEventListener("pointerup", dragEnd);
+      window.addEventListener("pointercancel", dragCancel);
+      window.addEventListener("keydown", dragKey, true);
+    };
+    // mouse: a drag starts after a few pixels of movement; touch: after a long press (moving first = scrolling the list)
+    const pre = (ev) => {
+      if (ev.pointerId !== p0.pid) return;
+      const dx = ev.clientX - p0.x, dy = ev.clientY - p0.y, far = Math.hypot(dx, dy) > MOVE_SLOP;
+      if (!far) return;
+      if (touch) cancelPress(); else { begin(); dragMove(ev); }
+    };
+    pressing = true;
+    window.addEventListener("pointermove", pre);
+    window.addEventListener("pointerup", cancelPress);
+    window.addEventListener("pointercancel", cancelPress);
+    if (touch) { item.classList.add("press"); pressTimer = setTimeout(begin, LONG_PRESS_MS); }
+  }
+  // While dragging on a phone, the finger must not scroll the list (touchmove is the only way to stop it).
+  sessionList.addEventListener("touchmove", (e) => { if (drag) e.preventDefault(); }, { passive: false });
+  function dragMove(ev) {
+    if (!drag || ev.pointerId !== drag.pid) return;
+    drag.lastY = ev.clientY;
+    const sibs = [...drag.box.querySelectorAll(".session-item")].filter((x) => x !== drag.item);
+    let before = null;
+    for (const sib of sibs) { const r = sib.getBoundingClientRect(); if (ev.clientY < r.top + r.height / 2) { before = sib; break; } }
+    if (before !== drag.item.nextElementSibling || (!before && drag.item !== drag.box.lastElementChild)) {
+      drag.box.insertBefore(drag.item, before);
+      drag.moved = true;
+    }
+    const lr = sessionList.getBoundingClientRect(); // auto-scroll near the edges of the list
+    if (ev.clientY < lr.top + 28) sessionList.scrollTop -= 10; else if (ev.clientY > lr.bottom - 28) sessionList.scrollTop += 10;
+  }
+  function dragFinish() {
+    window.removeEventListener("pointermove", dragMove);
+    window.removeEventListener("pointerup", dragEnd);
+    window.removeEventListener("pointercancel", dragCancel);
+    window.removeEventListener("keydown", dragKey, true);
+    sessionList.classList.remove("reordering");
+    const d = drag; drag = null;
+    d.item.classList.remove("dragging");
+    try { d.item.releasePointerCapture(d.pid); } catch (_) {}
+    dragJustEnded = true; setTimeout(() => { dragJustEnded = false; }, 0);
+    return d;
+  }
+  function dragEnd(ev) {
+    if (!drag || ev.pointerId !== drag.pid) return;
+    const d = dragFinish();
+    const now = [...d.box.querySelectorAll(".session-item")].map((x) => x.dataset.id);
+    if (!d.moved || now.join() === d.before.filter(Boolean).join()) { renderSidebar(); return; }
+    const all = [...sessionList.querySelectorAll(".session-item")].map((x) => x.dataset.id);
+    sendOrder(all, d.id);
+  }
+  function dragCancel() { if (drag) { dragFinish(); renderSidebar(); } }
+  function dragKey(e) { if (e.key === "Escape" && drag) { e.preventDefault(); e.stopPropagation(); dragCancel(); } }
+
+  // "2m" since the session last printed something (live sessions only; an
+  // exited one's age is meaningless). Tracked locally on every pty_output and
+  // seeded from the server's lastOutputAt, so it needs no extra traffic.
+  function ageLabel(s) {
+    if (s.info.status !== "running" || !s.lastOutputAt) return "";
+    const sec = Math.max(0, Math.floor((Date.now() - s.lastOutputAt) / 1000));
+    const txt = sec < 60 ? "<1m" : sec < 3600 ? Math.floor(sec / 60) + "m" : sec < 86400 ? Math.floor(sec / 3600) + "h" : Math.floor(sec / 86400) + "d";
+    return " · " + txt;
+  }
+  // Updates only the age spans in place: a full renderSidebar() would destroy
+  // a rename <input> the user is typing in.
+  setInterval(() => {
+    for (const node of sessionList.querySelectorAll("[data-age]")) {
+      const s = sessions.get(node.dataset.age);
+      if (s) node.textContent = ageLabel(s);
+    }
+  }, 15000);
+
+  // Respawns an exited session with the same kind + cwd. The old tombstone is
+  // closed locally only after the spawn request is sent; the server's
+  // pty_spawned reply then activates the fresh session.
+  function restartSession(id) {
+    const s = sessions.get(id);
+    if (!s) return;
+    send({ type: "pty_spawn", agent: s.info.agent, cwd: s.info.cwd, cols: 100, rows: 30 });
+    closedByMe.add(id);
+    forgetLocalSession(id);
+    renderSidebar();
+  }
+
+  function startRename(id, item) {
+    const s = sessions.get(id);
+    if (!s) return;
+    const titleRow = item.querySelector(".title-row");
+    const titleEl = item.querySelector("[data-title]");
+    const input = document.createElement("input");
+    input.className = "title-input";
+    input.value = (s.info.titleCustom && s.info.title) || customNames[id] || "";
+    input.placeholder = displayName(s);
+    titleRow.replaceChild(input, titleEl);
+    item.querySelector("[data-rename]").style.display = "none";
+    input.focus();
+    input.select();
+    const commit = () => {
+      const val = input.value.trim();
+      if (val) customNames[id] = val; else delete customNames[id];
+      saveCustomNames();
+      send({ type: "pty_rename", sessionId: id, title: val.slice(0, 80) });
+      // Optimistic local update; the server's pty_list broadcast confirms it.
+      s.info.title = val; s.info.titleCustom = !!val;
+      renderSidebar();
+      if (id === activeId) topbarTitle.textContent = `${displayName(sessions.get(id))} — ${sessions.get(id).info.cwd}`;
+    };
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") input.blur();
+      if (e.key === "Escape") { input.value = (s.info.titleCustom && s.info.title) || customNames[id] || ""; input.blur(); }
+    });
+    input.addEventListener("blur", commit, { once: true });
+  }
+
+  function shortenCwd(cwd) {
+    return cwd.replace(/^\/home\/[^/]+/, "~");
+  }
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
+  // ─── Spawn dialog ───────────────────────────────────
+  // Recently launched working directories, newest first, shown ahead of the
+  // static presets. localStorage can throw (private mode / blocked), so every
+  // access is wrapped and the dialog works fine without it.
+  const RECENT_KEY = "agent_terminal_recent_cwds", RECENT_MAX = 6;
+  function loadRecentCwds() {
+    try { const a = JSON.parse(localStorage.getItem(RECENT_KEY) || "[]"); return Array.isArray(a) ? a.filter((x) => typeof x === "string") : []; } catch (_) { return []; }
+  }
+  function rememberCwd(cwd) {
+    try {
+      const list = [cwd, ...loadRecentCwds().filter((c) => c !== cwd)].slice(0, RECENT_MAX);
+      localStorage.setItem(RECENT_KEY, JSON.stringify(list));
+    } catch (_) {}
+  }
+  function renderCwdPresets() {
+    cwdPresets.innerHTML = "";
+    const recents = loadRecentCwds();
+    const all = [...recents, ...CWD_PRESETS.filter((p) => !recents.includes(p))];
+    all.forEach((p) => {
+      const b = document.createElement("button");
+      b.textContent = p;
+      if (recents.includes(p)) b.title = "Recently used";
+      b.addEventListener("click", () => { spawnCwd.value = p; });
+      cwdPresets.appendChild(b);
+    });
+  }
+
+  function openSpawnDialog() {
+    renderCwdPresets();
+    spawnDialog.classList.add("open");
+    spawnCwd.value = "";
+    spawnCwd.focus();
+  }
+  function closeSpawnDialog() { spawnDialog.classList.remove("open"); }
+
+  el("new-session-btn").addEventListener("click", openSpawnDialog);
+  el("empty-new-btn").addEventListener("click", openSpawnDialog);
+  el("spawn-cancel").addEventListener("click", closeSpawnDialog);
+  spawnDialog.addEventListener("click", (e) => { if (e.target === spawnDialog) closeSpawnDialog(); });
+
+  function renderAgentToggle() {
+    const box = el("agent-toggle");
+    box.innerHTML = "";
+    for (const a of AGENTS) {
+      const btn = document.createElement("button");
+      btn.dataset.agent = a.id;
+      btn.textContent = a.label;
+      if (a.id === selectedAgent) btn.classList.add("selected");
+      btn.addEventListener("click", () => { selectedAgent = a.id; renderAgentToggle(); syncResumeBox(); });
+      box.appendChild(btn);
+    }
+    syncResumeBox();
+  }
+  function syncResumeBox() {
+    const a = AGENTS.find((x) => x.id === selectedAgent);
+    el("spawn-resume").style.display = a && a.canResume ? "" : "none";
+    if (!(a && a.canResume)) el("spawn-resume-cb").checked = false;
+  }
+
+  el("spawn-go").addEventListener("click", () => {
+    const cwd = spawnCwd.value.trim() || "~";
+    send({ type: "pty_spawn", agent: selectedAgent, cwd, cols: 100, rows: 30, resume: el("spawn-resume-cb").checked });
+    rememberCwd(cwd);
+    el("spawn-resume-cb").checked = false; // a one-off choice, not a sticky default
+    closeSpawnDialog();
+  });
+
+  // ─── Sidebar toggle (mobile) ─────────────────────────
+  function setSidebarOpen(open) {
+    sidebar.classList.toggle("mobile-hidden", !open);
+    sidebarBackdrop.classList.toggle("show", open && window.innerWidth < 900);
+  }
+  el("hamburger").addEventListener("click", () => setSidebarOpen(sidebar.classList.contains("mobile-hidden")));
+  sidebarBackdrop.addEventListener("click", () => setSidebarOpen(false));
+  function closeSidebarOnMobile() {
+    if (window.innerWidth < 900) setSidebarOpen(false);
+  }
+
+  // ─── Keyboard-aware viewport (mobile) ────────────────
+  // 100dvh accounts for browser chrome (address bar) hiding/showing, but NOT
+  // for the on-screen keyboard on most Android/Chrome versions — the layout
+  // stays full-height and the keyboard just covers the bottom of it, burying
+  // the key toolbar and often the input focus point. visualViewport tracks
+  // the actually-visible area (keyboard excluded) so we can shrink #app to
+  // match; `interactive-widget=resizes-content` (in the viewport meta tag)
+  // does the same thing declaratively on browsers that support it — this is
+  // the JS fallback for the rest (notably iOS Safari).
+  function applyViewportHeight() {
+    const vv = window.visualViewport;
+    const h = vv ? vv.height : window.innerHeight;
+    document.documentElement.style.setProperty("--app-height", h + "px");
+    if (activeId) {
+      const s = sessions.get(activeId);
+      if (s) requestAnimationFrame(() => s.fit.fit());
+    }
+  }
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", applyViewportHeight);
+    window.visualViewport.addEventListener("scroll", applyViewportHeight);
+  }
+  applyViewportHeight();
+
+  // ─── Voice input (dictate into the active terminal) ──────────────────
+  // Dictation: only shown when the server has `transcribeUrl` configured. Records via
+  // MediaRecorder, posts the blob to /api/transcribe, and types the returned text into the
+  // active session exactly like a keystroke — no auto-Enter, so dictation
+  // errors are visible and correctable before you actually run anything,
+  // same as normal typing.
+  let mediaRecorder = null, recordedChunks = [], micState = "idle", micMaxTimer = null;
+  const micBtn = el("mic-btn");
+
+  function stopRecording() {
+    clearTimeout(micMaxTimer);
+    if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
+  }
+
+  micBtn.addEventListener("click", async () => {
+    if (micState === "transcribing") return;
+    if (micState === "recording") { stopRecording(); return; }
+    if (!activeId) { showToast("Open a session first"); return; }
+    if (!navigator.mediaDevices?.getUserMedia) { showToast("Mic not available (needs HTTPS)"); return; }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      recordedChunks = [];
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus") ? "audio/webm;codecs=opus" : "audio/webm";
+      mediaRecorder = new MediaRecorder(stream, { mimeType });
+      mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
+      mediaRecorder.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop());
+        micState = "transcribing";
+        micBtn.classList.remove("recording");
+        micBtn.classList.add("busy");
+        transcribeRecording();
+      };
+      mediaRecorder.start();
+      micState = "recording";
+      micBtn.classList.add("recording");
+      micMaxTimer = setTimeout(stopRecording, 60_000); // safety cap on a runaway recording
+    } catch (err) {
+      showToast(`Mic blocked: ${err.name || err.message || err}`);
+    }
+  });
+
+  async function transcribeRecording() {
+    try {
+      const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || "audio/webm" });
+      const resp = await fetch("/api/transcribe", {
+        method: "POST",
+        headers: { "Content-Type": blob.type },
+        body: blob,
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+      if (data.text && data.text.trim() && activeId) {
+        sessions.get(activeId)?.resetMirror(true);
+        send({ type: "pty_input", sessionId: activeId, data: data.text.trim() });
+        sessions.get(activeId)?.term.focus();
+      } else {
+        showToast("No speech detected");
+      }
+    } catch (err) {
+      showToast(`Transcribe failed: ${err.message || err}`);
+    } finally {
+      micState = "idle";
+      micBtn.classList.remove("busy");
+    }
+  }
+
+  // ─── Font size (shared across all sessions, persisted) ──────────────
+  function applyFontSize() {
+    localStorage.setItem("agent_terminal_font_size", String(fontSize));
+    for (const s of sessions.values()) {
+      s.term.options.fontSize = fontSize;
+      s.fit.fit();
+    }
+  }
+  el("font-smaller").addEventListener("click", () => {
+    fontSize = Math.max(FONT_MIN, fontSize - 1);
+    applyFontSize();
+  });
+  el("font-larger").addEventListener("click", () => {
+    fontSize = Math.min(FONT_MAX, fontSize + 1);
+    applyFontSize();
+  });
+
+  // ─── Swipe gestures (mobile): left/right switches sessions, up/down
+  // scrolls the terminal ──────────────────────────────────────────────
+  // Claude Code and Pi both enable terminal mouse-tracking (they're TUIs
+  // that scroll their own output/history), so a touchscreen has no native
+  // way to "wheel scroll" them — touch-dragging xterm's DOM viewport does
+  // nothing while a mouse-tracking app owns the alt-screen. The fix:
+  // translate vertical drag into synthetic `wheel` events dispatched on
+  // xterm's own element, which already has the correct logic wired up —
+  // it forwards a real mouse-wheel report to the child process when mouse
+  // tracking is on, or scrolls the native DOM scrollback when it's off.
+  // This reuses xterm's own handling rather than reimplementing the mouse
+  // reporting protocol.
+  //
+  // A gesture is classified once (after ~8px of movement) as horizontal
+  // (session switch, fires once on release) or vertical (continuous
+  // scroll, fires per touchmove) so the two never fight each other.
+  (function setupSwipe() {
+    let sx = 0, sy = 0, lastY = 0, st = 0, tracking = false, mode = null; // mode: null | "h" | "v"
+    termContainer.addEventListener("touchstart", (e) => {
+      if (e.touches.length !== 1) { tracking = false; return; }
+      sx = e.touches[0].clientX; sy = lastY = e.touches[0].clientY; st = Date.now();
+      tracking = true; mode = null;
+    }, { passive: true });
+
+    termContainer.addEventListener("touchmove", (e) => {
+      if (!tracking || e.touches.length !== 1) return;
+      const t = e.touches[0];
+      const dxTotal = t.clientX - sx, dyTotal = t.clientY - sy;
+      if (!mode) {
+        if (Math.abs(dxTotal) < 8 && Math.abs(dyTotal) < 8) return; // not enough movement yet
+        mode = Math.abs(dyTotal) > Math.abs(dxTotal) ? "v" : "h";
+      }
+      if (mode !== "v") return; // horizontal case resolves at touchend below
+      const entry = activeId && sessions.get(activeId);
+      // Don't hijack a long-press-then-drag text selection (the standard
+      // mobile way to select text, which is also mostly-vertical motion)
+      // as a scroll gesture — that broke Copy entirely, since preventDefault
+      // here also suppresses the browser's native selection-handle drag.
+      if (entry && entry.term.hasSelection()) return;
+      e.preventDefault(); // stop native scroll from double-applying alongside our synthetic wheel
+      const target = entry && entry.term.element;
+      if (target) {
+        const deltaY = lastY - t.clientY; // finger up -> positive -> "scroll down/forward", matching natural touch panning
+        target.dispatchEvent(new WheelEvent("wheel", { deltaY: deltaY * 2.2, deltaMode: 0, bubbles: true, cancelable: true }));
+      }
+      lastY = t.clientY;
+    }, { passive: false });
+
+    termContainer.addEventListener("touchend", (e) => {
+      if (!tracking) return;
+      tracking = false;
+      if (mode === "v") { mode = null; return; }
+      const t = e.changedTouches[0];
+      const dx = t.clientX - sx, dy = t.clientY - sy, dt = Date.now() - st;
+      mode = null;
+      if (dt > 400 || Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 1.8) return;
+      const ids = displayOrder();
+      if (ids.length < 2 || !activeId) return;
+      const idx = ids.indexOf(activeId);
+      const nextIdx = dx < 0 ? (idx + 1) % ids.length : (idx - 1 + ids.length) % ids.length;
+      activate(ids[nextIdx]);
+    }, { passive: true });
+  })();
+
+  // ─── Copy / paste (mobile clipboard is otherwise painful to reach) ──
+  // With the compose bar open the keyboard belongs to it: don't pull focus back into xterm's textarea.
+  const composeBar = el("compose-bar"), composeInput = el("compose-input");
+  const refocus = (term) => { if (composeBar.classList.contains("open")) composeInput.focus(); else term.focus(); };
+
+  el("copy-btn").addEventListener("click", async () => {
+    if (!activeId) return;
+    const s = sessions.get(activeId);
+    const text = s && s.term.getSelection();
+    if (!text) { showToast("Select text first (Select button) or use Screen"); return; }
+    showToast((await copyText(text)) ? "Copied" : "Copy blocked by browser");
+  });
+
+  // Text of the rows currently on screen (not the scrollback), right-trimmed, trailing blank rows dropped.
+  function screenText(term) {
+    const b = term.buffer.active, lines = [];
+    for (let y = b.viewportY; y < b.viewportY + term.rows; y++) {
+      const l = b.getLine(y);
+      lines.push(l ? l.translateToString(true).replace(/\s+$/, "") : "");
+    }
+    while (lines.length && !lines[lines.length - 1]) lines.pop();
+    return lines.join("\n");
+  }
+  el("copy-screen-btn").addEventListener("click", async () => {
+    if (!activeId) return;
+    const s = sessions.get(activeId);
+    const text = s && screenText(s.term);
+    if (!text) { showToast("Screen is empty"); return; }
+    showToast((await copyText(text)) ? "Screen copied" : "Copy blocked by browser");
+  });
+
+  // Select mode: TUIs that enable mouse tracking swallow plain drags. xterm
+  // only starts a local selection when Shift is held, so while this toggle
+  // is on, re-dispatch each mousedown with shiftKey forced.
+  let selectMode = false;
+  const selectBtn = el("select-btn");
+  selectBtn.addEventListener("click", () => {
+    selectMode = !selectMode;
+    selectBtn.classList.toggle("active", selectMode);
+    showToast(selectMode ? "Select mode ON: drag to select text" : "Select mode off");
+    const e = activeId && sessions.get(activeId);
+    if (e) e.term.focus();
+  });
+  let redispatching = false;
+  termContainer.addEventListener("mousedown", (ev) => {
+    if (!selectMode || redispatching || ev.shiftKey || ev.button !== 0) return;
+    ev.stopImmediatePropagation();
+    ev.preventDefault();
+    redispatching = true;
+    try {
+      ev.target.dispatchEvent(new MouseEvent("mousedown", {
+        bubbles: true, cancelable: true, view: window, shiftKey: true,
+        clientX: ev.clientX, clientY: ev.clientY, screenX: ev.screenX, screenY: ev.screenY,
+        button: 0, buttons: ev.buttons, detail: ev.detail,
+      }));
+    } finally { redispatching = false; }
+  }, { capture: true });
+  let pasteBusy = false;
+  el("paste-btn").addEventListener("click", async () => {
+    if (!activeId) return;
+    // Guard against a double-fired tap/click pasting twice.
+    if (pasteBusy) return;
+    pasteBusy = true;
+    setTimeout(() => { pasteBusy = false; }, 600);
+    const text = await readClipboard();
+    const e = sessions.get(activeId);
+    // term.paste(): bracketed paste when the app asked for it, newlines as \r, and it goes out through onData like typing
+    // (the paste de-dup in term.onData only acts after a real DOM paste event, which this doesn't raise).
+    if (text && e) { e.resetMirror(true); e.term.paste(text); }
+    else if (text === "") showToast("Clipboard empty");
+    else if (text === null) showToast("Paste blocked on non-HTTPS: use Ctrl+Shift+V");
+    if (e) refocus(e.term);
+  });
+
+  // ─── Mobile key toolbar ──────────────────────────────
+  document.querySelectorAll("#key-toolbar button").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      if (!activeId) return;
+      const entry = sessions.get(activeId);
+      if (!entry) return;
+      entry.resetMirror(true); // keys sent directly bypass the Android input mirror
+      if (btn.dataset.ctrl) {
+        const code = btn.dataset.ctrl.toUpperCase().charCodeAt(0) - 64;
+        send({ type: "pty_input", sessionId: activeId, data: String.fromCharCode(code) });
+      } else if (btn.dataset.key === "Escape") {
+        send({ type: "pty_input", sessionId: activeId, data: "\x1b" });
+      } else if (btn.dataset.key === "Tab") {
+        send({ type: "pty_input", sessionId: activeId, data: "\t" });
+      } else if (btn.dataset.key === "Enter") {
+        send({ type: "pty_input", sessionId: activeId, data: "\r" });
+      } else if (btn.dataset.key === "ArrowUp") {
+        send({ type: "pty_input", sessionId: activeId, data: "\x1b[A" });
+      } else if (btn.dataset.key === "ArrowDown") {
+        send({ type: "pty_input", sessionId: activeId, data: "\x1b[B" });
+      } else if (btn.dataset.key === "ArrowRight") {
+        send({ type: "pty_input", sessionId: activeId, data: "\x1b[C" });
+      } else if (btn.dataset.key === "ArrowLeft") {
+        send({ type: "pty_input", sessionId: activeId, data: "\x1b[D" });
+      }
+      refocus(entry.term);
+    });
+    // Keep the on-screen keyboard (and the compose box's caret) where it is when a toolbar button is tapped.
+    const keepFocus = (ev) => ev.preventDefault();
+    btn.addEventListener("pointerdown", keepFocus);
+    btn.addEventListener("mousedown", keepFocus);
+  });
+
+  // ─── Compose bar ─────────────────────────────────────
+  // A normal textarea in front of the pty: the keyboard's suggestions, autocorrect and swipe typing edit it freely and
+  // only the final text is sent (on Enter / Send), so a replaced word never reaches the shell half-typed.
+  const composeBtn = el("compose-btn");
+  const xtermTextareas = () => termContainer.querySelectorAll("textarea.xterm-helper-textarea");
+  function sizeCompose() {
+    composeInput.style.height = "auto";
+    composeInput.style.height = Math.min(composeInput.scrollHeight + 2, 4 * 21 + 18) + "px"; // 1 to 4 lines
+    const s = activeId && sessions.get(activeId);
+    if (s) requestAnimationFrame(() => s.fit.fit());
+  }
+  function setCompose(on, focus) {
+    composeBar.classList.toggle("open", on);
+    composeBtn.classList.toggle("active", on);
+    composeBtn.setAttribute("aria-pressed", String(on));
+    // inputmode=none: tapping the terminal must not raise the keyboard for xterm's hidden textarea while compose is in use.
+    xtermTextareas().forEach((t) => (on ? t.setAttribute("inputmode", "none") : t.removeAttribute("inputmode")));
+    try { localStorage.setItem("terminal.compose", on ? "1" : "0"); } catch (_) { /* private mode */ }
+    sizeCompose();
+    if (on && focus) composeInput.focus();
+    else if (!on) { const s = activeId && sessions.get(activeId); if (s) s.term.focus(); }
+  }
+  composeBtn.addEventListener("click", () => setCompose(!composeBar.classList.contains("open"), true));
+  // Tapping a terminal while compose is open: redirect focus to the compose box.
+  termContainer.addEventListener("focusin", (ev) => {
+    if (!composeBar.classList.contains("open") || !ev.target.classList || !ev.target.classList.contains("xterm-helper-textarea")) return;
+    ev.target.setAttribute("inputmode", "none");
+    composeInput.focus();
+  });
+  function sendCompose() {
+    if (!activeId) return;
+    const entry = sessions.get(activeId);
+    if (!entry) return;
+    // ESC would let the text close a bracketed paste early and run what follows, so typed text never carries one.
+    const text = composeInput.value.replace(/\x1b/g, "");
+    let data;
+    if (!text) data = "\r";
+    else if (text.includes("\n")) {
+      const lines = text.replace(/\r?\n/g, "\r");
+      data = (entry.term.modes && entry.term.modes.bracketedPasteMode ? "\x1b[200~" + lines + "\x1b[201~" : lines) + "\r";
+    } else data = text + "\r";
+    send({ type: "pty_input", sessionId: activeId, data });
+    composeInput.value = "";
+    sizeCompose();
+    composeInput.focus();
+  }
+  let enterKeydownAt = 0;
+  composeInput.addEventListener("keydown", (ev) => {
+    if (ev.isComposing || ev.keyCode === 229) return;
+    if (ev.key === "Enter") {
+      enterKeydownAt = Date.now();
+      if (!ev.shiftKey) { ev.preventDefault(); sendCompose(); }
+    } else if (ev.key === "Backspace" && !composeInput.value && activeId) {
+      ev.preventDefault();
+      send({ type: "pty_input", sessionId: activeId, data: "\x7f" });
+    }
+  });
+  // Soft keyboards often skip keydown (keyCode 229) and only fire beforeinput.
+  composeInput.addEventListener("beforeinput", (ev) => {
+    if (ev.inputType === "insertLineBreak" && Date.now() - enterKeydownAt > 80) { ev.preventDefault(); sendCompose(); }
+    else if (ev.inputType === "deleteContentBackward" && !composeInput.value && activeId) {
+      ev.preventDefault();
+      send({ type: "pty_input", sessionId: activeId, data: "\x7f" });
+    }
+  });
+  composeInput.addEventListener("input", sizeCompose);
+  el("compose-send").addEventListener("click", sendCompose);
+  el("compose-send").addEventListener("pointerdown", (ev) => ev.preventDefault());
+  el("compose-send").addEventListener("mousedown", (ev) => ev.preventDefault());
+  try { if (localStorage.getItem("terminal.compose") === "1") setCompose(true, false); } catch (_) { /* no storage */ }
+
+  window.addEventListener("resize", () => {
+    if (splitMode) {
+      for (const id of splitIds) { const s = id && sessions.get(id); if (s) s.fit.fit(); }
+    } else if (activeId) {
+      const s = sessions.get(activeId);
+      if (s) s.fit.fit();
+    }
+  });
+  window.addEventListener("orientationchange", () => {
+    // Rotation resize events land a beat after the event fires on some
+    // Android builds — a single rAF isn't reliably late enough.
+    setTimeout(applyViewportHeight, 300);
+  });
+
+  // ─── Search scrollback ────────────────────────────────────────────
+  const searchBar = el("search-bar");
+  const searchInput = el("search-input");
+  const searchCount = el("search-count");
+  const searchBtn = el("search-btn");
+
+  function openSearch() {
+    if (!activeId) return;
+    searchBar.classList.add("open");
+    searchBtn.classList.add("active");
+    searchInput.focus();
+    searchInput.select();
+  }
+  function closeSearch() {
+    searchBar.classList.remove("open");
+    searchBtn.classList.remove("active");
+    searchCount.textContent = "";
+    const s = activeId && sessions.get(activeId);
+    if (s) { s.search.clearDecorations(); s.term.focus(); }
+  }
+  function activeSearch() {
+    const s = activeId && sessions.get(activeId);
+    return s ? s.search : null;
+  }
+  // resultIndex/resultCount (and onDidChangeResults firing at all) only get
+  // computed when a `decorations` option is passed — without it the addon
+  // just finds the one next/previous match and skips the full-buffer scan.
+  const SEARCH_OPTS = {
+    decorations: {
+      matchBackground: "#3a3a4a", matchBorder: "#6c8cff", matchOverviewRuler: "#6c8cff",
+      activeMatchBackground: "#6c8cff", activeMatchBorder: "#ffffff", activeMatchColorOverviewRuler: "#ffffff",
+    },
+  };
+  searchBtn.addEventListener("click", () => searchBar.classList.contains("open") ? closeSearch() : openSearch());
+  searchInput.addEventListener("input", () => {
+    const s = activeSearch();
+    if (s && searchInput.value) s.findNext(searchInput.value, { ...SEARCH_OPTS, incremental: true });
+    else if (s) s.clearDecorations();
+  });
+  searchInput.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { e.preventDefault(); closeSearch(); return; }
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const s = activeSearch();
+      if (!s || !searchInput.value) return;
+      e.shiftKey ? s.findPrevious(searchInput.value, SEARCH_OPTS) : s.findNext(searchInput.value, SEARCH_OPTS);
+    }
+  });
+  el("search-next").addEventListener("click", () => { const s = activeSearch(); if (s && searchInput.value) s.findNext(searchInput.value, SEARCH_OPTS); });
+  el("search-prev").addEventListener("click", () => { const s = activeSearch(); if (s && searchInput.value) s.findPrevious(searchInput.value, SEARCH_OPTS); });
+  el("search-close").addEventListener("click", closeSearch);
+
+  // ─── Keyboard shortcuts (desktop) ─────────────────────────────────
+  // Ctrl/Cmd+Shift+<key> deliberately — plain Ctrl+<letter> is real
+  // terminal input (Ctrl+C/D/U/R/W/A/E/K/... are all live readline/shell
+  // control characters), so anything that steals a bare Ctrl+letter combo
+  // would break normal shell editing. Shift added to every binding here
+  // sidesteps that class of conflict entirely.
+  document.addEventListener("keydown", (e) => {
+    const mod = e.ctrlKey || e.metaKey;
+    if (!mod || !e.shiftKey) return;
+    const key = e.key.toLowerCase();
+    if (key === "c") {
+      // Chrome binds Ctrl+Shift+C to DevTools inspect; claim it for copy.
+      e.preventDefault();
+      const s = activeId && sessions.get(activeId);
+      const t = s && s.term.getSelection();
+      if (t) copyText(t).then((ok) => showToast(ok ? "Copied" : "Copy blocked by browser"));
+      return;
+    }
+    if (key === "t") { e.preventDefault(); openSpawnDialog(); }
+    else if (key === "w") { e.preventDefault(); if (activeId) closeSession(activeId); }
+    else if (key === "f") { e.preventDefault(); searchBar.classList.contains("open") ? closeSearch() : openSearch(); }
+    else if (/^[1-9]$/.test(e.key)) {
+      e.preventDefault();
+      const ids = displayOrder();
+      const target = ids[Number(e.key) - 1];
+      if (target) { if (splitMode) exitSplit(); activate(target); }
+    }
+  }, { capture: true });
+
+  // Server-provided settings (agents, groups, presets, dictation), then the WebSocket.
+  const agentLabel = (id) => { const a = AGENTS.find((x) => x.id === id); return a ? a.label : id || "Session"; };
+  const agentColor = (id) => { let h = 0; for (const c of String(id)) h = (h * 31 + c.charCodeAt(0)) % 360; return `hsl(${h} 65% 58%)`; };
+  fetch("/api/config", { credentials: "same-origin" })
+    .then((r) => (r.ok ? r.json() : Promise.reject(new Error("HTTP " + r.status))))
+    .then((c) => {
+      AGENTS = c.agents || []; GROUPS = c.groups || []; CWD_PRESETS = c.cwdPresets && c.cwdPresets.length ? c.cwdPresets : ["~"];
+      selectedAgent = AGENTS.length ? AGENTS[0].id : "";
+      el("mic-btn").hidden = !c.transcribe;
+      renderAgentToggle();
+    })
+    .catch(() => showToast("Could not load settings (reload the page)"))
+    .finally(connect);
+})();
+</script>
+</body>
+</html>
