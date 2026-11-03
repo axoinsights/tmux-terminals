@@ -10,7 +10,7 @@ Start an agent on your laptop or server, walk away, and keep steering it from yo
   <img src="docs/screenshot-phone.png" alt="Tmux Terminals on a phone: terminal with the compose box and key toolbar" width="22%">
 </p>
 
-Made by [Axo Insights](https://www.axoinsights.com), which builds AI tools for civil rights and advocacy organizations.
+Made by [Axo Insights](https://www.axoinsights.com), a technology company modernizing democracy.
 
 - **Persistent**: every session is a tmux session on a dedicated socket. Restart the server, the agents keep running and are re-attached.
 - **Built for thumbs**: key toolbar (Esc, Tab, arrows, Ctrl-C...), a compose bar for autocorrect/voice typing, Paste / Copy / Screen buttons, select mode, swipe gestures, install as an app (PWA).
