@@ -52,6 +52,22 @@ export function extractToken(req: Pick<IncomingMessage, "headers" | "url">): Cre
   return { token: null, via: null };
 }
 
+/** Every token the request presents, so a stale cookie never hides a fresh `?token=` (e.g. after rotating the token). */
+export function allCredentials(req: Pick<IncomingMessage, "headers" | "url">): Array<{ token: string; via: NonNullable<Credentials["via"]> }> {
+  const out: Array<{ token: string; via: NonNullable<Credentials["via"]> }> = [];
+  const auth = req.headers.authorization;
+  if (auth && /^Bearer\s+/i.test(auth)) out.push({ token: auth.replace(/^Bearer\s+/i, "").trim(), via: "bearer" });
+  const cookie = parseCookies(req.headers.cookie)[COOKIE_NAME];
+  if (cookie) out.push({ token: cookie, via: "cookie" });
+  try {
+    const q = new URL(req.url || "/", "http://x").searchParams.get("token");
+    if (q) out.push({ token: q, via: "query" });
+  } catch {
+    /* bad url */
+  }
+  return out;
+}
+
 export type AuthResult = { ok: true; via: NonNullable<Credentials["via"]> } | { ok: false; status: 401 | 429; retryAfter?: number };
 
 interface Fail {
@@ -77,11 +93,13 @@ export class Authenticator {
   }
 
   check(req: Pick<IncomingMessage, "headers" | "url">, ip: string): AuthResult {
-    const cred = extractToken(req);
-    if (cred.token && safeEqual(cred.token, this.token)) {
+    const creds = allCredentials(req);
+    const good = creds.find((c) => safeEqual(c.token, this.token));
+    if (good) {
       this.fails.delete(ip);
-      return { ok: true, via: cred.via! };
+      return { ok: true, via: good.via };
     }
+    const cred = { token: creds.length ? creds[creds.length - 1].token : null };
     const now = this.now();
     const f = this.fails.get(ip);
     if (f && f.lockedUntil > now) return { ok: false, status: 429, retryAfter: Math.ceil((f.lockedUntil - now) / 1000) };

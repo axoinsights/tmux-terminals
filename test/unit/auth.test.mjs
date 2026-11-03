@@ -48,3 +48,9 @@ test("requests without credentials do not count as guesses", () => {
   const a = new Authenticator("secret-token-123456", { freeFailures: 1 });
   for (let i = 0; i < 10; i++) assert.equal(a.check(req(), "9.9.9.9").status, 401);
 });
+
+test("a stale cookie does not hide a fresh ?token= (after rotating the token)", () => {
+  const a = new Authenticator("new-token");
+  const r = a.check({ headers: { cookie: "at_auth=old-token" }, url: "/?token=new-token" }, "1.2.3.4");
+  assert.deepEqual(r, { ok: true, via: "query" });
+});
