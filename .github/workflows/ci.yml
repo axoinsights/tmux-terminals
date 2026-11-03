@@ -1,0 +1,31 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - name: Install tmux
+        run: sudo apt-get update && sudo apt-get install -y tmux
+      - run: npm ci
+      - name: Install Playwright (kept out of package.json so a normal install stays light)
+        run: |
+          npm install --no-save playwright@1
+          npx playwright install --with-deps chromium
+      - name: Doctor
+        run: node bin/agent-terminal.mjs doctor
+      - name: Tests (unit + browser end-to-end)
+        run: npm test
+        env:
+          REQUIRE_PLAYWRIGHT: "1"
