@@ -68,6 +68,7 @@ try {
   await shot(dp, "terminal-desktop-dark-dragging.png");
   await dp.mouse.up();
   await until(async () => JSON.stringify((await titles(dp))[0]) === '["charlie","alpha","bravo"]', 5000, "drag result");
+  await until(() => JSON.stringify(savedOrder().slice(0, 3)) === JSON.stringify(["charlie", "alpha", "bravo"].map(idOf)), 5000, "saved order").catch(() => {});
   check("mouse drag reorders and the server stores it", JSON.stringify(savedOrder().slice(0, 3)) === JSON.stringify(["charlie", "alpha", "bravo"].map(idOf)), JSON.stringify(savedOrder()));
   check("the click ending a drag does not open the session", await dp.evaluate(() => !document.querySelector(".session-item.active")?.textContent.includes("charlie")));
 
@@ -89,6 +90,7 @@ try {
   await itemOf(dp, "charlie").hover();
   await itemOf(dp, "charlie").locator('[data-move="1"]').click();
   await until(async () => JSON.stringify((await titles(dp))[0]) === '["alpha","charlie","bravo"]', 5000, "move down button");
+  await until(() => JSON.stringify(savedOrder().slice(0, 3)) === JSON.stringify(["alpha", "charlie", "bravo"].map(idOf)), 5000, "saved order").catch(() => {});
   check("Move down button", JSON.stringify(savedOrder().slice(0, 3)) === JSON.stringify(["alpha", "charlie", "bravo"].map(idOf)), JSON.stringify(savedOrder()));
   const upDisabled = await itemOf(dp, "alpha").locator('[data-move="-1"]').isDisabled();
   check("Move up is disabled on the first item", upDisabled);
@@ -117,6 +119,8 @@ try {
   await shot(pp, "terminal-360-light-dragging.png");
   await touch("touchEnd", p1.x, p0.y);
   await until(async () => (await titles(pp))[1][0] === "agent task · add dark mode", 5000, "touch drag result");
+  // The list redraws before the server has written the order file: wait for the file too (slower CI runners lose that race).
+  await until(async () => JSON.stringify(savedOrder().slice(3)) === '["g0-cc-bbbbbb","g0-cc-aaaaaa"]', 5000, "saved touch order").catch(() => {});
   check("long-press drag reorders the watched group on the phone", JSON.stringify(savedOrder().slice(3)) === '["g0-cc-bbbbbb","g0-cc-aaaaaa"]', JSON.stringify(savedOrder()));
   await until(async () => (await titles(dp))[1][0] === "agent task · add dark mode", 5000, "desktop follows");
   check("the desktop follows the phone's change without a reload", true);
