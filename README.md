@@ -16,13 +16,19 @@ Made by [Axo Insights](https://www.axoinsights.com), which builds AI tools for c
 - **Built for thumbs**: key toolbar (Esc, Tab, arrows, Ctrl-C...), a compose bar for autocorrect/voice typing, Paste / Copy / Screen buttons, select mode, swipe gestures, install as an app (PWA).
 - **Many sessions**: sidebar with rename, kill, drag-and-drop order (shared by all your devices), split view, scrollback search, OSC 52 clipboard.
 - **Safe by default**: random token required on every route (also from localhost), loopback bind, WebSocket origin check, no shell strings, your own tmux server is never touched.
-- **Easy to install, for people and for AI agents**: `npm install`, `tmux-terminals doctor --json`, `GET /healthz`. See [AGENTS.md](AGENTS.md).
+- **Easy to install, for people and for AI agents**: `npx tmux-terminals`, `tmux-terminals doctor --json`, `GET /healthz`. See [AGENTS.md](AGENTS.md).
 
 Linux and macOS. On Windows, use WSL2.
 
 ## Quick start (30 seconds)
 
 You need Node 20+ and tmux (`apt-get install -y tmux`, `dnf install tmux` or `brew install tmux`).
+
+```bash
+npx tmux-terminals
+```
+
+Or install it for good with `npm install -g tmux-terminals`, then run `tmux-terminals`. From source:
 
 ```bash
 git clone https://github.com/axoinsights/tmux-terminals.git tmux-terminals && cd tmux-terminals
@@ -45,7 +51,8 @@ Something wrong? `npm run doctor` (or `tmux-terminals doctor`) checks Node, tmux
 | Way | Commands |
 | --- | --- |
 | From a git checkout (main path) | `npm install && npm start` |
-| From a tarball (what `npx tmux-terminals` will be once published) | `npm pack` then `npx ./tmux-terminals-0.1.0.tgz` or `npm install -g ./tmux-terminals-0.1.0.tgz` |
+| From npm | `npx tmux-terminals` or `npm install -g tmux-terminals` |
+| From a tarball | `npm pack` then `npx ./tmux-terminals-0.1.0.tgz` or `npm install -g ./tmux-terminals-0.1.0.tgz` |
 | In a container (sandbox option) | `docker compose up -d --build`, see [Container](#container-sandbox-option) |
 
 Run it in the background: `tmux-terminals start --daemon` (stop with `tmux-terminals stop`), or install it as a service: `tmux-terminals install-service` (writes a systemd user unit on Linux or a launchd agent on macOS and prints the commands to enable it; it never enables anything silently).

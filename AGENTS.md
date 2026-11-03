@@ -2,7 +2,7 @@
 
 Every step below is non-interactive (no prompts, no TTY needed) and has a pass/fail check. Run the commands from the repository root unless stated. Exit code 0 means success.
 
-`<REPO_URL>` is the git URL you were given for this project (or skip step 1 if you already have the directory).
+`https://github.com/axoinsights/tmux-terminals.git` is the git URL you were given for this project (or skip step 1 if you already have the directory).
 
 ## 0. Prerequisites
 
@@ -14,12 +14,14 @@ Every step below is non-interactive (no prompts, no TTY needed) and has a pass/f
 ## 1. Install
 
 ```bash
-git clone <REPO_URL> tmux-terminals
+git clone https://github.com/axoinsights/tmux-terminals.git tmux-terminals
 cd tmux-terminals
 npm install
 ```
 
 `npm install` compiles TypeScript into `dist/` (the `prepare` script) and downloads prebuilt native modules, so no compiler is normally needed. Check: `test -f dist/cli.js && echo built`.
+
+Fastest alternative, from npm: `npm install -g tmux-terminals` puts a `tmux-terminals` command on PATH (or run it once with `npx --yes tmux-terminals doctor --json`); below, replace `node bin/tmux-terminals.mjs` with `tmux-terminals`.
 
 Alternative from a tarball: `npm pack` then `npm install -g ./tmux-terminals-0.1.0.tgz` (or run it once with `npx --yes ./tmux-terminals-0.1.0.tgz doctor --json`; use a path starting with `./`) puts a `tmux-terminals` command on PATH (below, replace `node bin/tmux-terminals.mjs` with `tmux-terminals`).
 
