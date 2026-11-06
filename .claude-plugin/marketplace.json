@@ -1,0 +1,24 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "axoinsights",
+  "description": "Agent skills and plugins from Axo Insights: self-hosted tools that keep coding agents usable from anywhere.",
+  "owner": {
+    "name": "Axo Insights",
+    "email": "luis@axoinsights.com"
+  },
+  "plugins": [
+    {
+      "name": "tmux-terminals",
+      "description": "One skill that installs, runs, exposes, diagnoses and scripts Tmux Terminals — the self-hosted web terminal for agents running in tmux (npm: tmux-terminals).",
+      "version": "0.2.0",
+      "author": {
+        "name": "Axo Insights",
+        "email": "luis@axoinsights.com"
+      },
+      "source": "./",
+      "homepage": "https://github.com/axoinsights/tmux-terminals",
+      "category": "developer-tools",
+      "tags": ["tmux", "terminal", "self-hosted", "skills", "claude-code", "codex", "mobile"]
+    }
+  ]
+}

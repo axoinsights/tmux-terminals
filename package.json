@@ -1,6 +1,6 @@
 {
   "name": "tmux-terminals",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Self-hosted, phone-friendly web terminal for driving coding agents (Claude Code, Codex, aider, pi, or a shell) that run in tmux on your own machine.",
   "license": "MIT",
   "author": "Axo Insights (https://www.axoinsights.com)",
@@ -12,6 +12,7 @@
     "bin",
     "dist",
     "web",
+    "skills",
     "tmux.conf",
     "AGENTS.md",
     "CHANGELOG.md",
@@ -40,7 +41,9 @@
     "aider",
     "xterm",
     "pwa",
-    "self-hosted"
+    "self-hosted",
+    "agent-skills",
+    "skill"
   ],
   "dependencies": {
     "@homebridge/node-pty-prebuilt-multiarch": "^0.15.0",

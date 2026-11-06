@@ -23,7 +23,11 @@ npm install
 
 Fastest alternative, from npm: `npm install -g tmux-terminals` puts a `tmux-terminals` command on PATH (or run it once with `npx --yes tmux-terminals doctor --json`); below, replace `node bin/tmux-terminals.mjs` with `tmux-terminals`.
 
-Alternative from a tarball: `npm pack` then `npm install -g ./tmux-terminals-0.1.0.tgz` (or run it once with `npx --yes ./tmux-terminals-0.1.0.tgz doctor --json`; use a path starting with `./`) puts a `tmux-terminals` command on PATH (below, replace `node bin/tmux-terminals.mjs` with `tmux-terminals`).
+Alternative from a tarball: `npm pack` then `npm install -g ./tmux-terminals-0.2.0.tgz` (or run it once with `npx --yes ./tmux-terminals-0.2.0.tgz doctor --json`; use a path starting with `./`) puts a `tmux-terminals` command on PATH (below, replace `node bin/tmux-terminals.mjs` with `tmux-terminals`).
+
+### There is also an agent skill
+
+`skills/tmux-terminals/` is this project packaged as an [Agent Skill](https://agentskills.io) (`SKILL.md` + `reference/{setup,cli,api,troubleshooting}.md` + `scripts/sessions.mjs`), and `.claude-plugin/{plugin,marketplace}.json` makes the repository a Claude Code plugin marketplace. Install it with `npx skills add axoinsights/tmux-terminals`, or in Claude Code: `/plugin marketplace add axoinsights/tmux-terminals` then `/plugin install tmux-terminals@axoinsights`. If you are reading this file because an agent found the checkout, the skill says the same things in less text and adds the WebSocket protocol.
 
 ## 2. Verify the environment
 

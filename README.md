@@ -12,6 +12,14 @@ Start an agent on your laptop or server, walk away, and keep steering it from yo
 
 Made by [Axo Insights](https://www.axoinsights.com), a technology company modernizing democracy.
 
+<p align="center">
+  <a href="https://www.npmjs.com/package/tmux-terminals"><img alt="npm" src="https://img.shields.io/npm/v/tmux-terminals?label=npm"></a>
+  <a href="https://skills.sh/axoinsights/tmux-terminals"><img alt="skills.sh" src="https://skills.sh/b/axoinsights/tmux-terminals"></a>
+  <a href="https://clawhub.ai/skills?q=tmux-terminals"><img alt="ClawHub" src="https://img.shields.io/badge/ClawHub-tmux--terminals-f97316"></a>
+  <a href="https://claude-plugins.dev/skills"><img alt="claude-plugins.dev" src="https://img.shields.io/badge/claude--plugins.dev-indexed-6366f1"></a>
+  <a href="https://github.com/axoinsights/tmux-terminals/actions/workflows/ci.yml"><img alt="ci" src="https://github.com/axoinsights/tmux-terminals/actions/workflows/ci.yml/badge.svg"></a>
+</p>
+
 - **Persistent**: every session is a tmux session on a dedicated socket. Restart the server, the agents keep running and are re-attached.
 - **Built for thumbs**: key toolbar (Esc, Tab, arrows, Ctrl-C...), a compose bar for autocorrect/voice typing, Paste / Copy / Screen buttons, select mode, swipe gestures, install as an app (PWA).
 - **Many sessions**: sidebar with rename, kill, drag-and-drop order (shared by all your devices), split view, scrollback search, OSC 52 clipboard.
@@ -39,7 +47,7 @@ npm start
 On the first run it creates `~/.config/tmux-terminals/config.json` (mode 600) with a random access token and prints a URL plus a QR code. Open the URL, press **New session**, pick an agent and a folder.
 
 ```
-tmux-terminals 0.1.0 listening on http://127.0.0.1:8767 (tmux socket "tmux-terminals", agents: shell, claude)
+tmux-terminals 0.2.0 listening on http://127.0.0.1:8767 (tmux socket "tmux-terminals", agents: shell, claude)
 Open this on the device you want to use (it contains your access token):
   http://127.0.0.1:8767/?token=...
 ```
@@ -52,10 +60,25 @@ Something wrong? `npm run doctor` (or `tmux-terminals doctor`) checks Node, tmux
 | --- | --- |
 | From a git checkout (main path) | `npm install && npm start` |
 | From npm | `npx tmux-terminals` or `npm install -g tmux-terminals` |
-| From a tarball | `npm pack` then `npx ./tmux-terminals-0.1.0.tgz` or `npm install -g ./tmux-terminals-0.1.0.tgz` |
+| From a tarball | `npm pack` then `npx ./tmux-terminals-0.2.0.tgz` or `npm install -g ./tmux-terminals-0.2.0.tgz` |
 | In a container (sandbox option) | `docker compose up -d --build`, see [Container](#container-sandbox-option) |
 
 Run it in the background: `tmux-terminals start --daemon` (stop with `tmux-terminals stop`), or install it as a service: `tmux-terminals install-service` (writes a systemd user unit on Linux or a launchd agent on macOS and prints the commands to enable it; it never enables anything silently).
+
+## Installing it as an agent skill
+
+This repository is also an **agent skill** (the [Agent Skills](https://agentskills.io) format: `skills/tmux-terminals/SKILL.md` + `reference/` + a read-only session script). It teaches your coding agent to install the server, expose it to your phone, diagnose it with `doctor`/`smoke`/`/healthz`, configure agents, and script sessions over the WebSocket protocol — so a sentence like "let me drive Claude Code from my phone" becomes one the agent can actually carry out.
+
+| Marketplace / route | Command |
+| --- | --- |
+| **skills.sh** (Claude Code, Codex, Cursor, OpenCode, pi and 75 more) | `npx skills add axoinsights/tmux-terminals` |
+| **Claude Code plugin marketplace** (this repo is one) | `/plugin marketplace add axoinsights/tmux-terminals` → `/plugin install tmux-terminals@axoinsights` |
+| **ClawHub** (OpenClaw) | `clawhub install tmux-terminals` |
+| **claude-plugins.dev** (community registry + CLI) | `npx skills-installer search tmux-terminals` → `npx skills-installer install @axoinsights/tmux-terminals/tmux-terminals` |
+| **npm** (the skill ships inside the package) | `npm i -D skills tmux-terminals && npx skills experimental_sync` |
+| **By hand** | copy `skills/tmux-terminals/` into `~/.claude/skills/`, `~/.codex/skills/`, `.claude/skills/`, `~/.openclaw/skills/`, … |
+
+The skill's own docs live in [`skills/tmux-terminals/SKILL.md`](skills/tmux-terminals/SKILL.md); humans get the same content in [AGENTS.md](AGENTS.md).
 
 ## Using it from your phone
 

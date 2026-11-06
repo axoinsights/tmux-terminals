@@ -2,7 +2,15 @@
 
 All notable changes to this project are documented here. Format: [Keep a Changelog](https://keepachangelog.com/), versioning: [SemVer](https://semver.org/).
 
-## [0.1.0] - Unreleased
+## [0.2.0] - Unreleased
+
+### Added
+- **Agent skill**: `skills/tmux-terminals/` — `SKILL.md` plus `reference/setup.md`, `reference/cli.md`, `reference/api.md`, `reference/troubleshooting.md` and `scripts/sessions.mjs` (lists the sessions of a running server over HTTP without putting the token on the command line). It teaches a coding agent to install, run, expose, diagnose and script the tool.
+- **Claude Code plugin manifests**: `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json`, so `claude plugin marketplace add axoinsights/tmux-terminals` + `/plugin install tmux-terminals@axoinsights` works straight from this repository.
+- The skill ships inside the npm package (`files` now includes `skills/`), which makes `npx skills experimental_sync` pick it up for anyone who installs `tmux-terminals` as a dependency.
+- README: badges and an "Installing it as an agent skill" table with the marketplace routes.
+
+## [0.1.0] - 2026-11-03
 
 First version, extracted from a private terminal hub.
 

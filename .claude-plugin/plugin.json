@@ -1,0 +1,22 @@
+{
+  "name": "tmux-terminals",
+  "description": "Install, expose, diagnose and script Tmux Terminals: a self-hosted, phone-friendly web terminal for coding agents (Claude Code, Codex, aider, pi, shell) running in tmux on your own machine.",
+  "version": "0.2.0",
+  "author": {
+    "name": "Axo Insights",
+    "email": "luis@axoinsights.com"
+  },
+  "homepage": "https://github.com/axoinsights/tmux-terminals",
+  "repository": "https://github.com/axoinsights/tmux-terminals",
+  "license": "MIT",
+  "keywords": [
+    "tmux",
+    "terminal",
+    "self-hosted",
+    "claude-code",
+    "codex",
+    "aider",
+    "mobile",
+    "skills"
+  ]
+}
