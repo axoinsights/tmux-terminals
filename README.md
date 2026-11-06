@@ -15,8 +15,6 @@ Made by [Axo Insights](https://www.axoinsights.com), a technology company modern
 <p align="center">
   <a href="https://www.npmjs.com/package/tmux-terminals"><img alt="npm" src="https://img.shields.io/npm/v/tmux-terminals?label=npm"></a>
   <a href="https://skills.sh/axoinsights/tmux-terminals"><img alt="skills.sh" src="https://skills.sh/b/axoinsights/tmux-terminals"></a>
-  <a href="https://clawhub.ai/skills?q=tmux-terminals"><img alt="ClawHub" src="https://img.shields.io/badge/ClawHub-tmux--terminals-f97316"></a>
-  <a href="https://claude-plugins.dev/skills"><img alt="claude-plugins.dev" src="https://img.shields.io/badge/claude--plugins.dev-indexed-6366f1"></a>
   <a href="https://github.com/axoinsights/tmux-terminals/actions/workflows/ci.yml"><img alt="ci" src="https://github.com/axoinsights/tmux-terminals/actions/workflows/ci.yml/badge.svg"></a>
 </p>
 
@@ -73,12 +71,12 @@ This repository is also an **agent skill** (the [Agent Skills](https://agentskil
 | --- | --- |
 | **skills.sh** (Claude Code, Codex, Cursor, OpenCode, pi and 75 more) | `npx skills add axoinsights/tmux-terminals` |
 | **Claude Code plugin marketplace** (this repo is one) | `/plugin marketplace add axoinsights/tmux-terminals` → `/plugin install tmux-terminals@axoinsights` |
-| **ClawHub** (OpenClaw) | `clawhub install tmux-terminals` |
+| **ClawHub** (OpenClaw) | `clawhub install tmux-terminals` *(publish step pending — see [docs/MARKETPLACES.md](docs/MARKETPLACES.md))* |
 | **claude-plugins.dev** (community registry + CLI) | `npx skills-installer search tmux-terminals` → `npx skills-installer install @axoinsights/tmux-terminals/tmux-terminals` |
 | **npm** (the skill ships inside the package) | `npm i -D skills tmux-terminals && npx skills experimental_sync` |
 | **By hand** | copy `skills/tmux-terminals/` into `~/.claude/skills/`, `~/.codex/skills/`, `.claude/skills/`, `~/.openclaw/skills/`, … |
 
-The skill's own docs live in [`skills/tmux-terminals/SKILL.md`](skills/tmux-terminals/SKILL.md); humans get the same content in [AGENTS.md](AGENTS.md).
+The skill's own docs live in [`skills/tmux-terminals/SKILL.md`](skills/tmux-terminals/SKILL.md); humans get the same content in [AGENTS.md](AGENTS.md). [docs/MARKETPLACES.md](docs/MARKETPLACES.md) lists every place this is published, what is still pending, and how to submit it to the curated directories.
 
 ## Using it from your phone
 
